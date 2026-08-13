@@ -21,10 +21,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     job_type = Column(String)  # 간호사 / 소방관 / 공장 근로자 등
+    terms_agreed = Column(Boolean, default=False)  # 개인정보 수집 동의
     created_at = Column(DateTime, default=datetime.utcnow)
 
     uploads = relationship("ShiftUpload", back_populates="user")

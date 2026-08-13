@@ -25,6 +25,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     job_type = Column(String)  # 간호사 / 소방관 / 공장 근로자 등
+    work_pattern = Column(String)  # fixed_day / fixed_night / rotation_2 / rotation_3 / custom
     terms_agreed = Column(Boolean, default=False)  # 개인정보 수집 동의
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -42,8 +43,10 @@ class ShiftUpload(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     image_path = Column(String, nullable=False)
+    note = Column(String)  # 루틴 생성에 참고할 특이사항 (선택 입력)
     status = Column(String, default="pending")  # pending / processing / done / failed
     error_message = Column(String)  # 인식 실패 시 원인
+    confirmed_at = Column(DateTime)  # 사용자가 인식 결과를 확인/확정한 시각
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="uploads")
@@ -62,6 +65,8 @@ class Shift(Base):
     shift_type = Column(String, nullable=False)  # day / evening / night / off
     start_time = Column(Time)
     end_time = Column(Time)
+    needs_review = Column(Boolean, default=False)  # AI 인식이 불확실해 사용자 확인 필요
+    review_message = Column(String)  # needs_review일 때 보여줄 안내 문구
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="shifts")

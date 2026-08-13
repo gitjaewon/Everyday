@@ -1,0 +1,13 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite 파일과 업로드 이미지를 컨테이너 재시작 후에도 유지한다
+      - ./backend/data:/app/data
+      # 개발 중 코드 변경을 바로 반영
+      - ./backend/app:/app/app
+    env_file:
+      - ./backend/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

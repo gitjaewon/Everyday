@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date as date_type, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
-from ..models import Shift, ShiftUpload, User
+from ..models import RoutineItem, Shift, ShiftUpload, User
+from ..routine_ai import generate_routines
 from ..schemas import (
+    RoutineItemResponse,
+    RoutineStatusUpdateRequest,
     ShiftBulkUpdateRequest,
     ShiftResponse,
     ShiftUploadCreateRequest,
@@ -144,3 +147,83 @@ def confirm_shift_upload(
         image_url=f"/images/{os.path.basename(upload.image_path)}",
         created_at=upload.created_at,
     )
+
+
+@router.post(
+    "/uploads/{upload_id}/routines", response_model=list[RoutineItemResponse], status_code=201
+)
+def generate_routines_for_upload(
+    upload_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _get_owned_upload(upload_id, current_user, db)
+
+    shifts = (
+        db.query(Shift)
+        .filter(Shift.upload_id == upload_id, Shift.user_id == current_user.id)
+        .order_by(Shift.work_date)
+        .all()
+    )
+    if not shifts:
+        raise HTTPException(status_code=400, detail="근무 일정이 없습니다")
+
+    shifts_by_date = {shift.work_date: shift for shift in shifts}
+    day_routines = generate_routines(shifts)
+
+    routine_items = [
+        RoutineItem(
+            user_id=current_user.id,
+            shift_id=shifts_by_date[day.work_date].id,
+            category=item.type,
+            title=item.label,
+            description=item.note,
+            start_time=item.time,
+        )
+        for day in day_routines
+        if day.work_date in shifts_by_date
+        for item in day.items
+    ]
+
+    db.add_all(routine_items)
+    db.commit()
+    for routine_item in routine_items:
+        db.refresh(routine_item)
+
+    return routine_items
+
+
+@router.get("/routines/{work_date}", response_model=list[RoutineItemResponse])
+def list_routines_for_date(
+    work_date: date_type,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(RoutineItem)
+        .join(Shift, RoutineItem.shift_id == Shift.id)
+        .filter(Shift.work_date == work_date, RoutineItem.user_id == current_user.id)
+        .order_by(RoutineItem.start_time)
+        .all()
+    )
+
+
+@router.patch("/routines/{routine_id}", response_model=RoutineItemResponse)
+def update_routine_status(
+    routine_id: int,
+    payload: RoutineStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    routine_item = (
+        db.query(RoutineItem)
+        .filter(RoutineItem.id == routine_id, RoutineItem.user_id == current_user.id)
+        .first()
+    )
+    if routine_item is None:
+        raise HTTPException(status_code=404, detail="루틴 항목을 찾을 수 없습니다")
+
+    routine_item.status = payload.status.value
+    db.commit()
+    db.refresh(routine_item)
+    return routine_item

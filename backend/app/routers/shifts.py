@@ -1,3 +1,4 @@
+import mimetypes
 import os
 from datetime import date as date_type, datetime
 
@@ -17,6 +18,7 @@ from ..schemas import (
     ShiftUploadCreateRequest,
     ShiftUploadResponse,
 )
+from ..shift_ocr import recognize_shifts
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
 
@@ -40,9 +42,38 @@ def create_shift_upload(
         user_id=current_user.id,
         image_path=file_path,
         note=payload.note,
-        status="pending",
+        status="processing",
     )
     db.add(upload)
+    db.commit()
+    db.refresh(upload)
+
+    try:
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+        content_type = mimetypes.guess_type(file_path)[0] or "image/jpeg"
+
+        recognized = recognize_shifts(image_bytes, content_type, note=payload.note)
+
+        shifts = [
+            Shift(
+                user_id=current_user.id,
+                upload_id=upload.id,
+                work_date=item.work_date,
+                shift_type=item.shift_type,
+                start_time=item.start_time,
+                end_time=item.end_time,
+                needs_review=item.needs_review,
+                review_message=item.review_message,
+            )
+            for item in recognized
+        ]
+        db.add_all(shifts)
+        upload.status = "done"
+    except Exception as e:
+        upload.status = "failed"
+        upload.error_message = str(e)
+
     db.commit()
     db.refresh(upload)
 
@@ -90,7 +121,27 @@ def update_shifts(
 ):
     _get_owned_upload(upload_id, current_user, db)
 
-    shift_ids = [item.id for item in payload.shifts]
+    update_items = [item for item in payload.shifts if item.id is not None]
+    create_items = [item for item in payload.shifts if item.id is None]
+
+    for item in create_items:
+        if item.work_date is None or item.shift_type is None:
+            raise HTTPException(
+                status_code=400, detail="새로 추가하려면 work_date와 shift_type이 필요합니다"
+            )
+        db.add(
+            Shift(
+                user_id=current_user.id,
+                upload_id=upload_id,
+                work_date=item.work_date,
+                shift_type=item.shift_type,
+                start_time=item.start_time,
+                end_time=item.end_time,
+                needs_review=False,
+            )
+        )
+
+    shift_ids = [item.id for item in update_items]
     shifts = (
         db.query(Shift)
         .filter(
@@ -106,7 +157,7 @@ def update_shifts(
     if missing:
         raise HTTPException(status_code=404, detail=f"근무 일정을 찾을 수 없습니다: {sorted(missing)}")
 
-    for item in payload.shifts:
+    for item in update_items:
         shift = shifts_by_id[item.id]
         if item.shift_type is not None:
             shift.shift_type = item.shift_type

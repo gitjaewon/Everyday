@@ -87,7 +87,7 @@ class RoutineItem(Base):
     description = Column(String)
     start_time = Column(Time)
     end_time = Column(Time)
-    is_done = Column(Boolean, default=False)
+    status = Column(String, default="scheduled")  # scheduled / done / pending
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="routine_items")

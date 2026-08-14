@@ -102,3 +102,27 @@ class ShiftUpdateItem(BaseModel):
 
 class ShiftBulkUpdateRequest(BaseModel):
     shifts: list[ShiftUpdateItem]
+
+
+class RoutineStatus(str, Enum):
+    scheduled = "scheduled"   # 예정
+    done = "done"             # 완료
+    pending = "pending"       # 대기
+
+
+class RoutineItemResponse(BaseModel):
+    id: int
+    shift_id: int
+    category: str
+    title: str
+    description: str | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    status: RoutineStatus
+
+    class Config:
+        from_attributes = True
+
+
+class RoutineStatusUpdateRequest(BaseModel):
+    status: RoutineStatus

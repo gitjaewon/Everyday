@@ -4,9 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """환경변수로 주입되는 설정값. .env 파일에서도 읽는다."""
 
-    # Claude API
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-5"
+    # OpenAI API
+    api_key: str = ""
+    model: str = "gpt-4o"
 
     # 인증
     jwt_secret: str = "change-me-in-production"

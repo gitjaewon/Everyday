@@ -93,6 +93,22 @@ class ShiftResponse(BaseModel):
         from_attributes = True
 
 
+class ShiftCreateRequest(BaseModel):
+    work_date: date
+    shift_type: str
+    start_time: time | None = None
+    end_time: time | None = None
+
+
+class ShiftUpdateRequest(BaseModel):
+    work_date: date | None = None
+    shift_type: str | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    needs_review: bool | None = None
+    review_message: str | None = None
+
+
 class ShiftUpdateItem(BaseModel):
     id: int
     shift_type: str | None = None

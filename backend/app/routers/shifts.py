@@ -1,7 +1,7 @@
 import os
 from datetime import date as date_type, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
@@ -13,7 +13,9 @@ from ..schemas import (
     RoutineItemResponse,
     RoutineStatusUpdateRequest,
     ShiftBulkUpdateRequest,
+    ShiftCreateRequest,
     ShiftResponse,
+    ShiftUpdateRequest,
     ShiftUploadCreateRequest,
     ShiftUploadResponse,
 )
@@ -64,6 +66,137 @@ def _get_owned_upload(upload_id: int, current_user: User, db: Session) -> ShiftU
     if upload is None:
         raise HTTPException(status_code=404, detail="업로드 기록을 찾을 수 없습니다")
     return upload
+
+
+@router.post("/uploads/{upload_id}/analyze", response_model=list[ShiftResponse])
+def analyze_shift_upload(
+    upload_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create deterministic seven-day sample shifts until OCR is connected."""
+    upload = _get_owned_upload(upload_id, current_user, db)
+
+    existing_shifts = (
+        db.query(Shift)
+        .filter(Shift.upload_id == upload.id, Shift.user_id == current_user.id)
+        .order_by(Shift.work_date)
+        .all()
+    )
+    if existing_shifts:
+        if upload.status != "done":
+            upload.status = "done"
+            db.commit()
+        return existing_shifts
+
+    start_date = date_type.today()
+    sample_shifts = [
+        ("day", "08:00", "17:00", False, None),
+        ("night", "22:00", "07:00", False, None),
+        ("off", None, None, False, None),
+        ("day", "08:00", "17:00", True, "OCR 결과가 불명확합니다. 근무 시간을 확인해 주세요."),
+        ("night", "22:00", "07:00", False, None),
+        ("off", None, None, False, None),
+        ("day", "08:00", "17:00", False, None),
+    ]
+    shifts = [
+        Shift(
+            user_id=current_user.id,
+            upload_id=upload.id,
+            work_date=start_date.fromordinal(start_date.toordinal() + index),
+            shift_type=shift_type,
+            start_time=datetime.strptime(start_time, "%H:%M").time() if start_time else None,
+            end_time=datetime.strptime(end_time, "%H:%M").time() if end_time else None,
+            needs_review=needs_review,
+            review_message=review_message,
+        )
+        for index, (shift_type, start_time, end_time, needs_review, review_message) in enumerate(sample_shifts)
+    ]
+    db.add_all(shifts)
+    upload.status = "done"
+    db.commit()
+
+    return (
+        db.query(Shift)
+        .filter(Shift.upload_id == upload.id, Shift.user_id == current_user.id)
+        .order_by(Shift.work_date)
+        .all()
+    )
+
+
+@router.post("/manual", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
+def create_manual_shift(
+    payload: ShiftCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shift = Shift(user_id=current_user.id, **payload.model_dump())
+    db.add(shift)
+    db.commit()
+    db.refresh(shift)
+    return shift
+
+
+@router.get("", response_model=list[ShiftResponse])
+def list_shifts(
+    start: date_type = Query(..., description="조회 시작일 (YYYY-MM-DD)"),
+    end: date_type = Query(..., description="조회 종료일 (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if start > end:
+        raise HTTPException(status_code=422, detail="start는 end보다 늦을 수 없습니다.")
+    return (
+        db.query(Shift)
+        .filter(
+            Shift.user_id == current_user.id,
+            Shift.work_date >= start,
+            Shift.work_date <= end,
+        )
+        .order_by(Shift.work_date, Shift.id)
+        .all()
+    )
+
+
+@router.patch("/{shift_id}", response_model=ShiftResponse)
+def update_manual_shift(
+    shift_id: int,
+    payload: ShiftUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shift = (
+        db.query(Shift)
+        .filter(Shift.id == shift_id, Shift.user_id == current_user.id)
+        .first()
+    )
+    if shift is None:
+        raise HTTPException(status_code=404, detail="근무 일정을 찾을 수 없습니다.")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(shift, field, value)
+    db.commit()
+    db.refresh(shift)
+    return shift
+
+
+@router.delete("/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_manual_shift(
+    shift_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shift = (
+        db.query(Shift)
+        .filter(Shift.id == shift_id, Shift.user_id == current_user.id)
+        .first()
+    )
+    if shift is None:
+        raise HTTPException(status_code=404, detail="근무 일정을 찾을 수 없습니다.")
+
+    db.delete(shift)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/uploads/{upload_id}/shifts", response_model=list[ShiftResponse])

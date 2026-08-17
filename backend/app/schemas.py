@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from enum import Enum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkPattern(str, Enum):
@@ -41,6 +41,18 @@ class LoginRequest(BaseModel):
 
 class OnboardingRequest(BaseModel):
     work_pattern: WorkPattern
+
+
+class UserProfileUpdateRequest(BaseModel):
+    job_type: str = Field(min_length=1, max_length=50)
+
+    @field_validator("job_type")
+    @classmethod
+    def normalize_job_type(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("직군을 입력해 주세요.")
+        return value
 
 
 class UserResponse(BaseModel):

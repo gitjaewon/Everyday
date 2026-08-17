@@ -20,6 +20,8 @@ ROUTINE_ITEM_TYPES = [
     "exercise",
 ]
 
+ROUTINE_CHANGE_TYPES = ["new", "changed", "cancelled", "kept"]
+
 SUBMIT_ROUTINES_TOOL = {
     "type": "function",
     "function": {
@@ -70,6 +72,15 @@ class DayRoutineOut(BaseModel):
     items: list[RoutineItemOut]
 
 
+class RedesignedRoutineItemOut(BaseModel):
+    routine_item_id: int | None = None
+    category: str
+    title: str
+    time: time
+    note: str | None = None
+    change: str
+
+
 def _shift_to_line(shift) -> str:
     start = shift.start_time.strftime("%H:%M") if shift.start_time else "-"
     end = shift.end_time.strftime("%H:%M") if shift.end_time else "-"
@@ -103,3 +114,79 @@ def generate_routines(shifts: list) -> list[DayRoutineOut]:
     tool_call = completion.choices[0].message.tool_calls[0]
     days = json.loads(tool_call.function.arguments)["days"]
     return [DayRoutineOut(**day) for day in days]
+
+
+def generate_redesigned_routines(
+    routine_items: list, incident_type: str, start_time: time, end_time: time
+) -> list[RedesignedRoutineItemOut]:
+    """Return AI suggestions without mutating the user's saved routine items."""
+    routines_text = "\n".join(
+        " | ".join(
+            [
+                f"id={item.id}",
+                item.category,
+                item.title,
+                item.start_time.strftime("%H:%M") if item.start_time else "-",
+                item.description or "",
+            ]
+        )
+        for item in routine_items
+    ) or "등록된 루틴 없음"
+
+    submit_redesign_tool = {
+        "type": "function",
+        "function": {
+            "name": "submit_redesigned_routines",
+            "description": "이상 상황을 반영한 루틴 재설계 제안을 제출한다.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "routine_item_id": {"type": "integer"},
+                                "category": {"type": "string"},
+                                "title": {"type": "string"},
+                                "time": {"type": "string", "description": "HH:MM"},
+                                "note": {"type": "string"},
+                                "change": {
+                                    "type": "string",
+                                    "enum": ROUTINE_CHANGE_TYPES,
+                                },
+                            },
+                            "required": ["category", "title", "time", "change"],
+                        },
+                    }
+                },
+                "required": ["items"],
+            },
+        },
+    }
+
+    completion = client.chat.completions.create(
+        model=settings.model,
+        tools=[submit_redesign_tool],
+        tool_choice={
+            "type": "function",
+            "function": {"name": "submit_redesigned_routines"},
+        },
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    "다음은 교대근무자의 오늘 루틴이다.\n"
+                    f"{routines_text}\n\n"
+                    f"{start_time.strftime('%H:%M')}~{end_time.strftime('%H:%M')}에 "
+                    f"{incident_type} 이상 상황이 발생했다. 안전과 휴식을 우선해 루틴 "
+                    "변경안을 제안하라. 기존 루틴을 유지하면 change=kept, 시간을 바꾸면 "
+                    "changed, 취소하면 cancelled, 새 항목이면 new로 표시하라. "
+                    "routine_item_id는 기존 항목을 변경할 때만 포함하고, title과 note는 한국어로 작성하라."
+                ),
+            }
+        ],
+    )
+    tool_call = completion.choices[0].message.tool_calls[0]
+    items = json.loads(tool_call.function.arguments)["items"]
+    return [RedesignedRoutineItemOut(**item) for item in items]

@@ -2,7 +2,7 @@ import mimetypes
 import os
 from datetime import date as date_type, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
@@ -12,7 +12,8 @@ from ..models import RoutineItem, Shift, ShiftUpload, User
 from ..routine_ai import generate_routines
 from ..schemas import (
     RoutineItemResponse,
-    RoutineStatusUpdateRequest,
+    RoutineItemCreateRequest,
+    RoutineItemUpdateRequest,
     ShiftBulkUpdateRequest,
     ShiftResponse,
     ShiftUploadCreateRequest,
@@ -259,10 +260,35 @@ def list_routines_for_date(
     )
 
 
+@router.post("/routines", response_model=RoutineItemResponse, status_code=status.HTTP_201_CREATED)
+def create_routine_item(
+    payload: RoutineItemCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shift = (
+        db.query(Shift)
+        .filter(Shift.id == payload.shift_id, Shift.user_id == current_user.id)
+        .first()
+    )
+    if shift is None:
+        raise HTTPException(status_code=404, detail="근무 일정을 찾을 수 없습니다.")
+
+    routine_item = RoutineItem(
+        user_id=current_user.id,
+        **payload.model_dump(exclude={"status"}),
+        status=payload.status.value,
+    )
+    db.add(routine_item)
+    db.commit()
+    db.refresh(routine_item)
+    return routine_item
+
+
 @router.patch("/routines/{routine_id}", response_model=RoutineItemResponse)
-def update_routine_status(
+def update_routine_item(
     routine_id: int,
-    payload: RoutineStatusUpdateRequest,
+    payload: RoutineItemUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -274,7 +300,27 @@ def update_routine_status(
     if routine_item is None:
         raise HTTPException(status_code=404, detail="루틴 항목을 찾을 수 없습니다")
 
-    routine_item.status = payload.status.value
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(routine_item, field, value.value if field == "status" else value)
     db.commit()
     db.refresh(routine_item)
     return routine_item
+
+
+@router.delete("/routines/{routine_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_routine_item(
+    routine_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    routine_item = (
+        db.query(RoutineItem)
+        .filter(RoutineItem.id == routine_id, RoutineItem.user_id == current_user.id)
+        .first()
+    )
+    if routine_item is None:
+        raise HTTPException(status_code=404, detail="루틴 항목을 찾을 수 없습니다.")
+
+    db.delete(routine_item)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

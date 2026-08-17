@@ -152,6 +152,10 @@ export const httpApi: HarugyeolApi = {
   async updateWorkPattern(pattern) {
     await request('/users/me/work-pattern', { method: 'PATCH', body: JSON.stringify({ work_pattern: workPatternMap[pattern] }) });
   },
+  async getShiftsForMonth(year, month) {
+    const shifts = await request<ShiftResponse[]>(`/shifts?year=${year}&month=${month}`, { method: 'GET' });
+    return shifts.map(toWorkDay);
+  },
   async analyzeSchedule(upload) {
     const image = await uploadImage(upload);
     const created = await request<ShiftUploadResponse>('/shifts/uploads', {

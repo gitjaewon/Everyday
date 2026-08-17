@@ -127,3 +127,20 @@ class RoutineItemResponse(BaseModel):
 
 class RoutineStatusUpdateRequest(BaseModel):
     status: RoutineStatus
+
+
+class RoutineRedesignRequest(BaseModel):
+    incident_type: str = Field(min_length=1, max_length=50)
+    start_time: time
+    end_time: time
+    work_date: date = Field(default_factory=date.today)
+    alert_id: int | None = None
+
+
+class RoutineRedesignResponse(BaseModel):
+    routine_item_id: int | None = None
+    category: str
+    title: str
+    time: time
+    note: str | None = None
+    change: str

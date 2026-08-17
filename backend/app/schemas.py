@@ -125,6 +125,7 @@ class RoutineStatus(str, Enum):
 class RoutineItemResponse(BaseModel):
     id: int
     shift_id: int
+    work_date: date
     category: str
     title: str
     description: str | None = None

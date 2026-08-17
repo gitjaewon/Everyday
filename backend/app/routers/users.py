@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_user
 from ..database import get_db
 from ..models import User
-from ..schemas import OnboardingRequest, UserResponse
+from ..schemas import OnboardingRequest, UserProfileUpdateRequest, UserResponse
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -21,6 +21,18 @@ def update_work_pattern(
     db: Session = Depends(get_db),
 ):
     current_user.work_pattern = payload.work_pattern.value
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/profile", response_model=UserResponse)
+def update_profile(
+    payload: UserProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.job_type = payload.job_type
     db.commit()
     db.refresh(current_user)
     return current_user

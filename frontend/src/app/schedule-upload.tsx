@@ -9,6 +9,7 @@ import Close from '@/assets/icons/close-gray.svg';
 import Loader from '@/assets/icons/loader.svg';
 import { OnboardingHeader } from '@/components/domain';
 import { AppText, Button, FormField, Screen } from '@/components/ui';
+import { recognizedSchedule } from '@/data/mock-data';
 import { api } from '@/services/api';
 import { useAppStore } from '@/store/use-app-store';
 import { colors, radius, spacing } from '@/theme';
@@ -45,7 +46,11 @@ export default function ScheduleUploadScreen() {
   };
 
   const analyze = async () => {
-    if (!uri) return setError('근무표 사진을 먼저 선택해주세요.');
+    if (!uri) {
+      setSchedule(recognizedSchedule.map((day) => ({ ...day })));
+      router.replace('/recognition-result');
+      return;
+    }
     setAnalyzing(true);
     setError('');
     try {
@@ -99,7 +104,7 @@ export default function ScheduleUploadScreen() {
           />
           {error ? <AppText variant="caption" color={colors.danger}>{error}</AppText> : null}
           <View style={styles.spacer} />
-          <Button label="다음" disabled={!uri} onPress={analyze} />
+          <Button label="다음" onPress={analyze} />
         </>
       ) : null}
     </Screen>

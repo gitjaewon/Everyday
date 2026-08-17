@@ -79,7 +79,9 @@ export const useAppStore = create<AppState>((set) => ({
   patchWorkDay: (date, patch) =>
     set((state) => ({
       schedule: state.schedule.map((day) =>
-        day.date === date ? { ...day, ...patch, needsReview: patch.endTime ? false : day.needsReview } : day,
+        day.date === date
+          ? { ...day, ...patch, needsReview: patch.needsReview ?? (patch.endTime ? false : day.needsReview) }
+          : day,
       ),
     })),
   completeOnboarding: () => set({ onboardingComplete: true }),

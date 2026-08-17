@@ -14,6 +14,7 @@ from ..schemas import (
     RoutineItemResponse,
     RoutineStatusUpdateRequest,
     ShiftBulkUpdateRequest,
+    ShiftConfirmRequest,
     ShiftResponse,
     ShiftUploadCreateRequest,
     ShiftUploadResponse,
@@ -95,6 +96,68 @@ def _get_owned_upload(upload_id: int, current_user: User, db: Session) -> ShiftU
     if upload is None:
         raise HTTPException(status_code=404, detail="업로드 기록을 찾을 수 없습니다")
     return upload
+
+
+@router.post("/confirm", response_model=list[RoutineItemResponse], status_code=201)
+def confirm_schedule(
+    payload: ShiftConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """AI 인식 결과 확인 화면에서 확정한 근무 일정을 저장하고 그에 맞는 루틴을 생성한다."""
+    if not payload.shifts:
+        raise HTTPException(status_code=400, detail="근무 일정이 없습니다")
+
+    work_dates = [item.work_date for item in payload.shifts]
+    existing_by_date = {
+        shift.work_date: shift
+        for shift in db.query(Shift)
+        .filter(Shift.user_id == current_user.id, Shift.work_date.in_(work_dates))
+        .all()
+    }
+
+    shifts = []
+    for item in payload.shifts:
+        shift = existing_by_date.get(item.work_date)
+        if shift is None:
+            shift = Shift(user_id=current_user.id, work_date=item.work_date)
+            db.add(shift)
+        shift.shift_type = item.shift_type
+        shift.start_time = item.start_time
+        shift.end_time = item.end_time
+        shift.needs_review = False
+        shift.review_message = None
+        shifts.append(shift)
+    db.commit()
+    for shift in shifts:
+        db.refresh(shift)
+
+    shift_ids = [shift.id for shift in shifts]
+    db.query(RoutineItem).filter(RoutineItem.shift_id.in_(shift_ids)).delete(synchronize_session=False)
+    db.commit()
+
+    shifts_by_date = {shift.work_date: shift for shift in shifts}
+    day_routines = generate_routines(shifts)
+
+    routine_items = [
+        RoutineItem(
+            user_id=current_user.id,
+            shift_id=shifts_by_date[day.work_date].id,
+            category=item.type,
+            title=item.label,
+            description=item.note,
+            start_time=item.time,
+        )
+        for day in day_routines
+        if day.work_date in shifts_by_date
+        for item in day.items
+    ]
+    db.add_all(routine_items)
+    db.commit()
+    for routine_item in routine_items:
+        db.refresh(routine_item)
+
+    return routine_items
 
 
 @router.get("/uploads/{upload_id}/shifts", response_model=list[ShiftResponse])

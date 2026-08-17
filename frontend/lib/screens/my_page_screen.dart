@@ -157,7 +157,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('마이페이지')),
+      appBar: AppBar(title: const Text('설정')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),

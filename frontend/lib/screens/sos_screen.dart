@@ -80,7 +80,7 @@ class _SosScreenState extends State<SosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SOS')),
+      appBar: AppBar(title: const Text('돌발상황')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),

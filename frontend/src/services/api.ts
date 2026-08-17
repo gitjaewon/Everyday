@@ -18,6 +18,7 @@ export interface HarugyeolApi {
   updateWorkPattern(pattern: import('@/types/domain').ShiftTypeId): Promise<void>;
   analyzeSchedule(upload: UploadedSchedule): Promise<WorkDay[]>;
   confirmSchedule(schedule: WorkDay[]): Promise<RoutineItem[]>;
+  getRoutinesForDate(date: string): Promise<RoutineItem[]>;
   updateRoutine(id: string, status: RoutineStatus): Promise<RoutineItem>;
   redesignRoutine(report: IncidentReport): Promise<RedesignedRoutineItem[]>;
 }

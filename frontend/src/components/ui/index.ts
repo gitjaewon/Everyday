@@ -8,3 +8,4 @@ export { InlineAlert } from './inline-alert';
 export { Screen } from './screen';
 export { StatusBadge } from './status-badge';
 export { SwitchControl } from './switch-control';
+export { TimeWheelPicker } from './time-wheel-picker';

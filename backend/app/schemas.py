@@ -105,6 +105,17 @@ class ShiftBulkUpdateRequest(BaseModel):
     shifts: list[ShiftUpdateItem]
 
 
+class ShiftConfirmItem(BaseModel):
+    work_date: date
+    shift_type: str
+    start_time: time | None = None
+    end_time: time | None = None
+
+
+class ShiftConfirmRequest(BaseModel):
+    shifts: list[ShiftConfirmItem]
+
+
 class RoutineStatus(str, Enum):
     scheduled = "scheduled"   # 예정
     done = "done"             # 완료
@@ -114,6 +125,7 @@ class RoutineStatus(str, Enum):
 class RoutineItemResponse(BaseModel):
     id: int
     shift_id: int
+    work_date: date
     category: str
     title: str
     description: str | None = None

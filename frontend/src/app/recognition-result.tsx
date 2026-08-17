@@ -40,7 +40,7 @@ export default function RecognitionResultScreen() {
       <InlineAlert title={`확인이 필요한 날짜 ${reviewCount}개`} body="AI가 인식하지 못한 시각 및 일정이 있습니다." />
       <AppText variant="h3" style={styles.sectionTitle}>인식된 근무 일정</AppText>
       <View style={styles.list}>
-        {schedule.map((day) => <WorkDayCard key={day.date} day={day} onChange={(patch) => patchWorkDay(day.date, patch)} />)}
+        {schedule.map((day) => <WorkDayCard key={day.date} day={day} showDropdown onChange={(patch) => patchWorkDay(day.date, patch)} />)}
       </View>
       {error ? <AppText variant="caption" color={colors.danger}>{error}</AppText> : null}
       <Button label="확인" loading={loading} onPress={confirm} />

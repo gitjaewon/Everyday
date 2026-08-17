@@ -38,6 +38,8 @@ export type RoutineIconName =
 
 export interface RoutineItem {
   id: string;
+  /** ISO date (YYYY-MM-DD) the routine belongs to. */
+  date: string;
   title: string;
   time: string;
   status: RoutineStatus;

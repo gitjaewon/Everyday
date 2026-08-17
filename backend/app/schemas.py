@@ -55,6 +55,28 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class AlertCreateRequest(BaseModel):
+    alert_type: str = Field(min_length=1, max_length=50)
+    message: str = Field(min_length=1, max_length=500)
+    heart_rate: int | None = Field(default=None, ge=0)
+    drowsiness_level: int | None = Field(default=None, ge=0, le=10)
+    recommendation: str | None = Field(default=None, max_length=500)
+
+
+class AlertResponse(BaseModel):
+    id: int
+    alert_type: str
+    heart_rate: int | None = None
+    drowsiness_level: int | None = None
+    message: str
+    recommendation: str | None = None
+    is_resolved: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from enum import Enum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkPattern(str, Enum):

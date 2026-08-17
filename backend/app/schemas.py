@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from enum import Enum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkPattern(str, Enum):
@@ -127,3 +127,22 @@ class RoutineItemResponse(BaseModel):
 
 class RoutineStatusUpdateRequest(BaseModel):
     status: RoutineStatus
+
+
+class RoutineItemCreateRequest(BaseModel):
+    shift_id: int
+    category: str = Field(min_length=1, max_length=50)
+    title: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+    start_time: time | None = None
+    end_time: time | None = None
+    status: RoutineStatus = RoutineStatus.scheduled
+
+
+class RoutineItemUpdateRequest(BaseModel):
+    category: str | None = Field(default=None, min_length=1, max_length=50)
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+    start_time: time | None = None
+    end_time: time | None = None
+    status: RoutineStatus | None = None

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { recognizedSchedule, redesignedRoutines } from '@/data/mock-data';
+import { redesignedRoutines } from '@/data/mock-data';
 import type {
   AuthUser,
   RoutineItem,
@@ -20,7 +20,10 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || defaultApiUrl).r
 interface TokenResponse { access_token: string }
 interface UserResponse { id: number; username: string; name: string }
 interface ImageUploadResponse { image_url: string }
-interface ShiftUploadResponse { id: number }
+interface ShiftUploadResponse {
+  id: number;
+  status: 'pending' | 'processing' | 'done' | 'failed';
+}
 interface ShiftResponse {
   id: number;
   work_date: string;
@@ -148,16 +151,15 @@ export const httpApi: HarugyeolApi = {
       method: 'POST', body: JSON.stringify({ image_url: image.image_url, note: upload.note || null }),
     });
     latestUploadId = created.id;
-    try {
-      const shifts = await request<ShiftResponse[]>(`/shifts/uploads/${created.id}/analyze`, { method: 'POST' });
-      return shifts.map(toWorkDay);
-    } catch (error) {
-      // The OCR branch is not merged into main yet; retain deterministic review data until it lands.
-      if (error instanceof Error && (error.message.includes('(404)') || error.message.includes('(405)'))) {
-        return recognizedSchedule.map((day) => ({ ...day }));
-      }
-      throw error;
+    if (created.status !== 'done') {
+      throw new Error('근무표 인식에 실패했습니다. 사진을 다시 확인해 주세요.');
     }
+
+    const shifts = await request<ShiftResponse[]>(`/shifts/uploads/${created.id}/shifts`);
+    if (!shifts.length) {
+      throw new Error('인식된 근무 일정이 없습니다. 사진을 다시 확인해 주세요.');
+    }
+    return shifts.map(toWorkDay);
   },
   async confirmSchedule(schedule) {
     if (latestUploadId === null) return [];

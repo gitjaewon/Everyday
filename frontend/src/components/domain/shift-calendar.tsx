@@ -7,10 +7,17 @@ import { AppText } from '@/components/ui';
 const weekday = ['일', '월', '화', '수', '목', '금', '토'];
 const kindLabel: Record<ShiftKind, string> = { day: '주', evening: '오', night: '야', off: '휴', unknown: '!' };
 
-export function ShiftCalendar({ cells, onSelectReview }: { cells: CalendarCell[]; onSelectReview?: (day: number) => void }) {
-  const leading = 6; // 2026-08-01 is Saturday.
+interface ShiftCalendarProps {
+  year: number;
+  month: number;
+  cells: CalendarCell[];
+  onSelectReview?: (day: number) => void;
+}
+
+export function ShiftCalendar({ year, month, cells, onSelectReview }: ShiftCalendarProps) {
+  const leading = new Date(year, month - 1, 1).getDay();
   return (
-    <View style={styles.calendar} accessibilityLabel="2026년 8월 근무 달력">
+    <View style={styles.calendar} accessibilityLabel={`${year}년 ${month}월 근무 달력`}>
       {weekday.map((label) => <View key={label} style={styles.cell}><AppText variant="caption" align="center">{label}</AppText></View>)}
       {Array.from({ length: leading }).map((_, index) => <View key={`blank-${index}`} style={styles.cell} />)}
       {cells.map((cell) => {
@@ -19,7 +26,7 @@ export function ShiftCalendar({ cells, onSelectReview }: { cells: CalendarCell[]
           <Pressable
             key={cell.day}
             accessibilityRole={cell.needsReview ? 'button' : undefined}
-            accessibilityLabel={`8월 ${cell.day}일 ${kindLabel[kind]}`}
+            accessibilityLabel={`${month}월 ${cell.day}일 ${kindLabel[kind]}`}
             onPress={() => cell.needsReview && onSelectReview?.(cell.day)}
             style={[styles.cell, styles.dayCell, styles[kind]]}
           >

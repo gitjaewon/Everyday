@@ -1,31 +1,86 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AlertBadge from '@/assets/icons/alert-circle-badge.svg';
 import Close from '@/assets/icons/close.svg';
 import { ShiftCalendar } from '@/components/domain';
 import { AppText, BottomSheetModal, Button, Card, DisclaimerCard, InlineAlert, Screen } from '@/components/ui';
-import { augustCalendar } from '@/data/mock-data';
-import { useAppStore } from '@/store/use-app-store';
+import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
+import type { CalendarCell, PendingFix, WorkDay } from '@/types/domain';
+import { formatCalendarMonth, formatPendingDate } from '@/utils/formatters';
+
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+const today = new Date();
+const YEAR = today.getFullYear();
+const MONTH = today.getMonth() + 1;
+
+function buildCells(daysInMonth: number, shiftsByDay: Map<number, WorkDay>): CalendarCell[] {
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const shift = shiftsByDay.get(day);
+    return {
+      day,
+      kind: shift?.kind ?? 'off',
+      needsReview: shift?.needsReview ?? false,
+    };
+  });
+}
+
+function buildPendingFixes(shiftsByDay: Map<number, WorkDay>): PendingFix[] {
+  return Array.from(shiftsByDay.values())
+    .filter((shift) => shift.needsReview)
+    .map((shift) => {
+      const date = new Date(`${shift.date}T00:00:00`);
+      return {
+        id: shift.date,
+        label: formatPendingDate(MONTH, date.getDate(), WEEKDAY_LABELS[date.getDay()]),
+        status: '확인필요',
+        message: shift.reviewMessage || '시작·종료 시각을 확인해주세요.',
+      };
+    });
+}
 
 export default function ScheduleScreen() {
-  const pending = useAppStore((state) => state.pendingFixes);
-  const resolve = useAppStore((state) => state.resolvePendingFix);
+  const [shifts, setShifts] = useState<WorkDay[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getShiftsForMonth(YEAR, MONTH).then(setShifts).catch(() => setShifts([]));
+  }, []);
+
+  const shiftsByDay = useMemo(() => {
+    const map = new Map<number, WorkDay>();
+    for (const shift of shifts) {
+      const date = new Date(`${shift.date}T00:00:00`);
+      map.set(date.getDate(), shift);
+    }
+    return map;
+  }, [shifts]);
+
+  const daysInMonth = new Date(YEAR, MONTH, 0).getDate();
+  const cells = useMemo(() => buildCells(daysInMonth, shiftsByDay), [daysInMonth, shiftsByDay]);
+  const pending = useMemo(() => buildPendingFixes(shiftsByDay), [shiftsByDay]);
   const selected = pending.find((item) => item.id === selectedId);
 
-  const openDay = (day: number) => setSelectedId(`2026-08-${day < 10 ? `0${day}` : day}`);
-  const apply = () => { if (selectedId) resolve(selectedId); setSelectedId(null); };
+  const openDay = (day: number) => {
+    const iso = `${YEAR}-${String(MONTH).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setSelectedId(iso);
+  };
+  const apply = () => {
+    if (selectedId) setShifts((current) => current.map((shift) => shift.date === selectedId ? { ...shift, needsReview: false } : shift));
+    setSelectedId(null);
+  };
 
   return (
     <Screen scroll contentStyle={styles.screen}>
       <View style={styles.titleRow}>
-        <View><AppText variant="caption">2026년 8월</AppText><AppText variant="h1">근무표</AppText></View>
-        <Button label="근무표 수정" variant="outline" compact onPress={() => setSelectedId(pending[0]?.id ?? null)} />
+        <View><AppText variant="caption">{formatCalendarMonth(YEAR, MONTH)}</AppText><AppText variant="h1">근무표</AppText></View>
+        <Button label="근무표 수정" variant="outline" onPress={() => setSelectedId(pending[0]?.id ?? null)} />
       </View>
       {pending.length ? <InlineAlert title={`확인이 필요한 날짜 ${pending.length}개`} body="AI가 인식하지 못한 시각이 있습니다." /> : <InlineAlert tone="success" title="모든 근무표를 확인했습니다." />}
-      <ShiftCalendar cells={augustCalendar} onSelectReview={openDay} />
+      <ShiftCalendar year={YEAR} month={MONTH} cells={cells} onSelectReview={openDay} />
       <AppText variant="caption" color={colors.textSecondary}>수정 대기 목록</AppText>
       <View style={styles.list}>
         {pending.map((item) => (

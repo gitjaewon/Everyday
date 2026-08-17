@@ -1,8 +1,9 @@
+import calendar
 import mimetypes
 import os
 from datetime import date as date_type, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
@@ -22,6 +23,28 @@ from ..schemas import (
 from ..shift_ocr import recognize_shifts
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
+
+
+@router.get("", response_model=list[ShiftResponse])
+def list_shifts_for_month(
+    year: int = Query(..., description="조회할 연도"),
+    month: int = Query(..., ge=1, le=12, description="조회할 월 (1~12)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """한 달치 근무 일정을 통으로 조회한다. DB에 없는 날짜는 그냥 빠지며, 빈 날짜 채우기는 프론트 몫이다."""
+    start = date_type(year, month, 1)
+    end = date_type(year, month, calendar.monthrange(year, month)[1])
+    return (
+        db.query(Shift)
+        .filter(
+            Shift.user_id == current_user.id,
+            Shift.work_date >= start,
+            Shift.work_date <= end,
+        )
+        .order_by(Shift.work_date, Shift.id)
+        .all()
+    )
 
 
 @router.post("/uploads", response_model=ShiftUploadResponse, status_code=201)

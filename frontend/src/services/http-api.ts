@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { recognizedSchedule, redesignedRoutines } from '@/data/mock-data';
+import { redesignedRoutines } from '@/data/mock-data';
 import type {
   AuthUser,
   RoutineItem,
@@ -20,7 +20,7 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || defaultApiUrl).r
 interface TokenResponse { access_token: string }
 interface UserResponse { id: number; username: string; name: string }
 interface ImageUploadResponse { image_url: string }
-interface ShiftUploadResponse { id: number }
+interface ShiftUploadResponse { id: number; status: string }
 interface ShiftResponse {
   id: number;
   work_date: string;
@@ -32,6 +32,7 @@ interface ShiftResponse {
 }
 interface RoutineResponse {
   id: number;
+  work_date: string;
   title: string;
   category: string;
   start_time: string | null;
@@ -95,6 +96,17 @@ function toWorkDay(shift: ShiftResponse): WorkDay {
   };
 }
 
+function toRoutineItem(routine: RoutineResponse): RoutineItem {
+  return {
+    id: String(routine.id),
+    date: routine.work_date,
+    title: routine.title,
+    time: timeValue(routine.start_time) || '',
+    status: routine.status === 'done' ? 'done' : routine.status === 'scheduled' ? 'planned' : 'waiting',
+    icon: ['sleep', 'meal', 'caffeine'].indexOf(routine.category) >= 0 ? routine.category as RoutineItem['icon'] : 'work',
+  };
+}
+
 const workPatternMap: Record<ShiftTypeId, string> = {
   'fixed-day': 'fixed_day',
   'fixed-night': 'fixed_night',
@@ -106,8 +118,6 @@ const workPatternMap: Record<ShiftTypeId, string> = {
 const routineStatusMap: Record<RoutineStatus, 'scheduled' | 'done' | 'pending'> = {
   done: 'done', planned: 'scheduled', postponed: 'pending', waiting: 'pending',
 };
-
-let latestUploadId: number | null = null;
 
 async function authenticate(path: '/auth/login' | '/auth/signup', payload: object) {
   const token = await request<TokenResponse>(path, { method: 'POST', authenticated: false, body: JSON.stringify(payload) });
@@ -142,51 +152,40 @@ export const httpApi: HarugyeolApi = {
   async updateWorkPattern(pattern) {
     await request('/users/me/work-pattern', { method: 'PATCH', body: JSON.stringify({ work_pattern: workPatternMap[pattern] }) });
   },
+  async getShiftsForMonth(year, month) {
+    const shifts = await request<ShiftResponse[]>(`/shifts?year=${year}&month=${month}`, { method: 'GET' });
+    return shifts.map(toWorkDay);
+  },
   async analyzeSchedule(upload) {
     const image = await uploadImage(upload);
     const created = await request<ShiftUploadResponse>('/shifts/uploads', {
       method: 'POST', body: JSON.stringify({ image_url: image.image_url, note: upload.note || null }),
     });
-    latestUploadId = created.id;
-    try {
-      const shifts = await request<ShiftResponse[]>(`/shifts/uploads/${created.id}/analyze`, { method: 'POST' });
-      return shifts.map(toWorkDay);
-    } catch (error) {
-      // The OCR branch is not merged into main yet; retain deterministic review data until it lands.
-      if (error instanceof Error && (error.message.includes('(404)') || error.message.includes('(405)'))) {
-        return recognizedSchedule.map((day) => ({ ...day }));
-      }
-      throw error;
-    }
+    if (created.status === 'failed') throw new Error('근무표 인식에 실패했습니다. 다시 시도해주세요.');
+    const shifts = await request<ShiftResponse[]>(`/shifts/uploads/${created.id}/shifts`, { method: 'GET' });
+    return shifts.map(toWorkDay);
   },
   async confirmSchedule(schedule) {
-    if (latestUploadId === null) return [];
-    const shifts = schedule.filter((day) => day.backendId).map((day) => ({
-      id: day.backendId, shift_type: day.kind, start_time: day.startTime, end_time: day.endTime,
+    if (!schedule.length) return [];
+    const shifts = schedule.map((day) => ({
+      work_date: day.date,
+      shift_type: day.kind === 'unknown' ? 'day' : day.kind,
+      start_time: day.startTime,
+      end_time: day.endTime,
     }));
-    if (shifts.length) {
-      await request(`/shifts/uploads/${latestUploadId}/shifts`, { method: 'PATCH', body: JSON.stringify({ shifts }) });
-    }
-    await request(`/shifts/uploads/${latestUploadId}/confirm`, { method: 'POST' });
-    if (!shifts.length) return [];
-    const routines = await request<RoutineResponse[]>(`/shifts/uploads/${latestUploadId}/routines`, { method: 'POST' });
-    return routines.map((routine) => ({
-      id: String(routine.id),
-      title: routine.title,
-      time: timeValue(routine.start_time) || '',
-      status: routine.status === 'done' ? 'done' : routine.status === 'scheduled' ? 'planned' : 'waiting',
-      icon: ['sleep', 'meal', 'caffeine'].indexOf(routine.category) >= 0 ? routine.category as RoutineItem['icon'] : 'work',
-    }));
+    const routines = await request<RoutineResponse[]>('/shifts/confirm', { method: 'POST', body: JSON.stringify({ shifts }) });
+    return routines.map(toRoutineItem);
+  },
+  async getRoutinesForDate(date) {
+    const routines = await request<RoutineResponse[]>(`/shifts/routines/${date}`, { method: 'GET' });
+    return routines.map(toRoutineItem);
   },
   async updateRoutine(id, status) {
     if (!/^\d+$/.test(id)) throw new Error('서버에서 생성된 루틴만 동기화할 수 있습니다.');
     const routine = await request<RoutineResponse>(`/shifts/routines/${id}`, {
       method: 'PATCH', body: JSON.stringify({ status: routineStatusMap[status] }),
     });
-    return {
-      id: String(routine.id), title: routine.title, time: timeValue(routine.start_time) || '', status,
-      icon: ['sleep', 'meal', 'caffeine'].indexOf(routine.category) >= 0 ? routine.category as RoutineItem['icon'] : 'work',
-    };
+    return toRoutineItem(routine);
   },
   async redesignRoutine() {
     // FastAPI currently has no incident/redesign router. Keep this isolated fallback until that contract is added.

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import Base, engine
-from .routers import auth, images, routines, shifts, users
+from .routers import alerts, auth, images, routines, shifts, users
 
 
 @asynccontextmanager
@@ -43,6 +43,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(images.router)
 app.include_router(shifts.router)
+app.include_router(alerts.router)
 app.include_router(routines.router)
 
 

@@ -59,13 +59,13 @@ export const weekDays: WeekDay[] = [
 ];
 
 export const initialRoutines: RoutineItem[] = [
-  { id: 'wake', title: '기상', time: '14:30', status: 'done', icon: 'wake' },
-  { id: 'lunch', title: '점심 식사', time: '15:00', status: 'done', icon: 'meal' },
-  { id: 'caffeine', title: '카페인 금지', time: '18:30', status: 'postponed', icon: 'caffeine' },
-  { id: 'dinner', title: '저녁 식사', time: '19:30', status: 'planned', icon: 'meal' },
-  { id: 'prepare', title: '출근 준비', time: '20:30', status: 'planned', icon: 'commute' },
-  { id: 'work', title: '야간 근무 시작', time: '22:00', status: 'waiting', icon: 'work', current: true },
-  { id: 'sleep', title: '퇴근 후 파워냅', time: '06:30', status: 'waiting', icon: 'sleep' },
+  { id: 'wake', date: '2026-08-09', title: '기상', time: '14:30', status: 'done', icon: 'wake' },
+  { id: 'lunch', date: '2026-08-09', title: '점심 식사', time: '15:00', status: 'done', icon: 'meal' },
+  { id: 'caffeine', date: '2026-08-09', title: '카페인 금지', time: '18:30', status: 'postponed', icon: 'caffeine' },
+  { id: 'dinner', date: '2026-08-09', title: '저녁 식사', time: '19:30', status: 'planned', icon: 'meal' },
+  { id: 'prepare', date: '2026-08-09', title: '출근 준비', time: '20:30', status: 'planned', icon: 'commute' },
+  { id: 'work', date: '2026-08-09', title: '야간 근무 시작', time: '22:00', status: 'waiting', icon: 'work', current: true },
+  { id: 'sleep', date: '2026-08-09', title: '퇴근 후 파워냅', time: '06:30', status: 'waiting', icon: 'sleep' },
 ];
 
 const calendarKinds: Array<CalendarCell['kind']> = [

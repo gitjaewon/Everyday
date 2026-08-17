@@ -1,49 +1,105 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { RoutineCard, WeekStrip } from '@/components/domain';
 import { AppText, DisclaimerCard, Screen } from '@/components/ui';
-import { homeSummary, weekDays } from '@/data/mock-data';
 import { api } from '@/services/api';
-import { useAppStore } from '@/store/use-app-store';
 import { colors, spacing } from '@/theme';
+import type { RoutineItem, RoutineStatus, WorkDay } from '@/types/domain';
 import { formatProgress } from '@/utils/formatters';
 
-export default function HomeScreen() {
-  const routines = useAppStore((state) => state.routines);
-  const setStatus = useAppStore((state) => state.setRoutineStatus);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const completed = useMemo(() => routines.filter((item) => item.status === 'done').length, [routines]);
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const SHIFT_LABEL: Record<WorkDay['kind'], string> = {
+  day: '주간 근무', evening: '오후 근무', night: '야간 근무', off: '휴무', unknown: '확인 필요',
+};
 
-  const changeStatus = async (id: string, status: Parameters<typeof setStatus>[1]) => {
-    const previous = routines.find((item) => item.id === id)?.status;
-    setStatus(id, status);
+const today = new Date();
+
+function getWeekDates(base: Date): Date[] {
+  const start = new Date(base);
+  start.setDate(base.getDate() - base.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+}
+
+function toIsoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+export default function HomeScreen() {
+  const [monthShifts, setMonthShifts] = useState<WorkDay[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>(toIsoDate(today));
+  const [dayRoutines, setDayRoutines] = useState<RoutineItem[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getShiftsForMonth(today.getFullYear(), today.getMonth() + 1).then(setMonthShifts).catch(() => setMonthShifts([]));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getRoutinesForDate(selectedDate)
+      .then((routines) => { if (!cancelled) setDayRoutines(routines); })
+      .catch(() => { if (!cancelled) setDayRoutines([]); });
+    return () => { cancelled = true; };
+  }, [selectedDate]);
+
+  const shiftsByDate = useMemo(() => new Map(monthShifts.map((shift) => [shift.date, shift])), [monthShifts]);
+
+  const weekDays = useMemo(
+    () =>
+      getWeekDates(today).map((d) => {
+        const iso = toIsoDate(d);
+        const shift = shiftsByDate.get(iso);
+        return {
+          date: iso,
+          weekday: WEEKDAY_LABELS[d.getDay()],
+          day: d.getDate(),
+          kind: shift?.kind ?? 'off',
+          selected: iso === selectedDate,
+        };
+      }),
+    [shiftsByDate, selectedDate],
+  );
+
+  const todayShift = shiftsByDate.get(toIsoDate(today));
+  const dateLabel = `${today.getFullYear()}. ${String(today.getMonth() + 1).padStart(2, '0')}. ${String(today.getDate()).padStart(2, '0')}.`;
+  const shiftLabel = todayShift ? SHIFT_LABEL[todayShift.kind] : '근무표 없음';
+
+  const completed = useMemo(() => dayRoutines.filter((item) => item.status === 'done').length, [dayRoutines]);
+
+  const changeStatus = async (id: string, status: RoutineStatus) => {
+    const previous = dayRoutines.find((item) => item.id === id)?.status;
+    setDayRoutines((current) => current.map((item) => (item.id === id ? { ...item, status } : item)));
     setExpanded(null);
     if (!/^\d+$/.test(id)) return;
     try {
       await api.updateRoutine(id, status);
     } catch {
-      if (previous) setStatus(id, previous);
+      if (previous) setDayRoutines((current) => current.map((item) => (item.id === id ? { ...item, status: previous } : item)));
     }
   };
 
   return (
     <Screen scroll padded={false} contentStyle={styles.screen}>
       <View style={styles.header}>
-        <AppText variant="caption">{homeSummary.dateLabel}　|　{homeSummary.shiftLabel}</AppText>
-        <AppText variant="h1">{homeSummary.headline}</AppText>
-        <AppText variant="body2">{homeSummary.tip}</AppText>
+        <AppText variant="caption">{dateLabel}　|　{shiftLabel}</AppText>
+        <AppText variant="h1">오늘의 루틴</AppText>
         <View style={styles.progressCopy}>
           <AppText variant="caption" color={colors.textSecondary}>진행도</AppText>
-          <AppText variant="body2">{formatProgress(completed, homeSummary.total)}</AppText>
+          <AppText variant="body2">{formatProgress(completed, dayRoutines.length)}</AppText>
         </View>
-        <View style={styles.track}><View style={[styles.progress, { width: `${(completed / homeSummary.total) * 100}%` }]} /></View>
+        <View style={styles.track}><View style={[styles.progress, { width: dayRoutines.length ? `${(completed / dayRoutines.length) * 100}%` : '0%' }]} /></View>
       </View>
       <View style={styles.body}>
-        <WeekStrip days={weekDays} />
+        <WeekStrip days={weekDays} onSelect={setSelectedDate} />
         <View style={styles.timeline}>
           <View style={styles.line} />
-          {routines.map((item) => (
+          {dayRoutines.map((item) => (
             <View key={item.id} style={styles.timelineRow}>
               <View style={[styles.dot, item.status === 'done' && styles.dotDone, item.status === 'postponed' && styles.dotPostponed]} />
               <View style={styles.routine}>
@@ -56,6 +112,7 @@ export default function HomeScreen() {
               </View>
             </View>
           ))}
+          {!dayRoutines.length ? <AppText variant="body2" color={colors.textSecondary}>이 날짜에는 루틴이 없습니다.</AppText> : null}
         </View>
         <DisclaimerCard />
       </View>

@@ -93,6 +93,10 @@ class RoutineItem(Base):
     user = relationship("User", back_populates="routine_items")
     shift = relationship("Shift", back_populates="routine_items")
 
+    @property
+    def work_date(self):
+        return self.shift.work_date
+
 
 class Alert(Base):
     """신체 이상 징후 발생 기록과 추천 대처법."""

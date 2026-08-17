@@ -1,20 +1,31 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme';
 import type { WeekDay } from '@/types/domain';
 import { AppText, StatusBadge } from '@/components/ui';
 
-export function WeekStrip({ days }: { days: WeekDay[] }) {
+interface WeekStripProps {
+  days: (WeekDay & { date: string })[];
+  onSelect?: (date: string) => void;
+}
+
+export function WeekStrip({ days, onSelect }: WeekStripProps) {
   return (
     <View style={styles.card} accessibilityLabel="이번 주 근무 일정">
       {days.map((day) => (
-        <View key={day.day} style={[styles.day, day.selected && styles.selected]}>
+        <Pressable
+          key={day.date}
+          accessibilityRole={onSelect ? 'button' : undefined}
+          accessibilityLabel={`${day.weekday}요일 ${day.day}일 일정 보기`}
+          onPress={() => onSelect?.(day.date)}
+          style={[styles.day, day.selected && styles.selected]}
+        >
           <AppText variant="caption" align="center">{day.weekday}</AppText>
           <View style={[styles.number, day.selected && styles.numberSelected]}>
             <AppText variant="body2" color={day.selected ? colors.onBrand : colors.text}>{day.day}</AppText>
           </View>
           <StatusBadge value={day.kind} />
-        </View>
+        </Pressable>
       ))}
     </View>
   );

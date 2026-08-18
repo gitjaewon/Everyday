@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AlertBadge from '@/assets/icons/alert-circle-badge.svg';
-import Close from '@/assets/icons/close.svg';
 import { ShiftCalendar } from '@/components/domain';
-import { AppText, BottomSheetModal, Button, Card, DisclaimerCard, InlineAlert, Screen } from '@/components/ui';
+import { AppText, Button, ButtonRow, Card, DisclaimerCard, InlineAlert, Screen } from '@/components/ui';
 import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
 import type { CalendarCell, PendingFix, WorkDay } from '@/types/domain';
@@ -43,12 +43,14 @@ function buildPendingFixes(shiftsByDay: Map<number, WorkDay>): PendingFix[] {
 }
 
 export default function ScheduleScreen() {
+  const router = useRouter();
   const [shifts, setShifts] = useState<WorkDay[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.getShiftsForMonth(YEAR, MONTH).then(setShifts).catch(() => setShifts([]));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      api.getShiftsForMonth(YEAR, MONTH).then(setShifts).catch(() => setShifts([]));
+    }, []),
+  );
 
   const shiftsByDay = useMemo(() => {
     const map = new Map<number, WorkDay>();
@@ -62,29 +64,24 @@ export default function ScheduleScreen() {
   const daysInMonth = new Date(YEAR, MONTH, 0).getDate();
   const cells = useMemo(() => buildCells(daysInMonth, shiftsByDay), [daysInMonth, shiftsByDay]);
   const pending = useMemo(() => buildPendingFixes(shiftsByDay), [shiftsByDay]);
-  const selected = pending.find((item) => item.id === selectedId);
 
-  const openDay = (day: number) => {
-    const iso = `${YEAR}-${String(MONTH).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    setSelectedId(iso);
-  };
-  const apply = () => {
-    if (selectedId) setShifts((current) => current.map((shift) => shift.date === selectedId ? { ...shift, needsReview: false } : shift));
-    setSelectedId(null);
-  };
+  const editSchedule = () => router.push('/schedule-edit');
 
   return (
     <Screen scroll contentStyle={styles.screen}>
       <View style={styles.titleRow}>
         <View><AppText variant="caption">{formatCalendarMonth(YEAR, MONTH)}</AppText><AppText variant="h1">근무표</AppText></View>
-        <Button label="근무표 수정" variant="outline" onPress={() => setSelectedId(pending[0]?.id ?? null)} />
+        <ButtonRow>
+          <Button compact label="근무표 추가" variant="outline" onPress={() => router.push('/schedule-upload')} />
+          <Button compact label="근무표 수정" variant="outline" onPress={editSchedule} />
+        </ButtonRow>
       </View>
       {pending.length ? <InlineAlert title={`확인이 필요한 날짜 ${pending.length}개`} body="AI가 인식하지 못한 시각이 있습니다." /> : <InlineAlert tone="success" title="모든 근무표를 확인했습니다." />}
-      <ShiftCalendar year={YEAR} month={MONTH} cells={cells} onSelectReview={openDay} />
+      <ShiftCalendar year={YEAR} month={MONTH} cells={cells} onSelectReview={editSchedule} />
       <AppText variant="caption" color={colors.textSecondary}>수정 대기 목록</AppText>
       <View style={styles.list}>
         {pending.map((item) => (
-          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${item.label} 수정 필요`} onPress={() => setSelectedId(item.id)}>
+          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`${item.label} 수정 필요`} onPress={editSchedule}>
             <Card tone="danger" style={styles.pending}>
               <AlertBadge width={40} height={40} />
               <View style={styles.pendingCopy}>
@@ -97,20 +94,6 @@ export default function ScheduleScreen() {
         ))}
       </View>
       <DisclaimerCard />
-
-      <BottomSheetModal visible={Boolean(selected)} onClose={() => setSelectedId(null)}>
-        {selected ? (
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <AlertBadge width={40} height={40} />
-              <View style={styles.pendingCopy}><AppText variant="body1" style={styles.bold}>{selected.label}</AppText><AppText variant="caption" color={colors.danger}>{selected.status}</AppText></View>
-              <Pressable accessibilityRole="button" accessibilityLabel="닫기" onPress={() => setSelectedId(null)}><Close width={24} height={24} /></Pressable>
-            </View>
-            <Card tone="danger"><AppText variant="caption" color={colors.danger}>{selected.message}{`\n`}AI 보정안을 확인하거나 직접 입력해주세요.</AppText></Card>
-            <Button label="AI 보정안 적용하기" onPress={apply} />
-          </View>
-        ) : null}
-      </BottomSheetModal>
     </Screen>
   );
 }
@@ -122,6 +105,4 @@ const styles = StyleSheet.create({
   pending: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pendingCopy: { flex: 1 },
   bold: { fontWeight: '700' },
-  sheet: { gap: spacing.lg },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
 });

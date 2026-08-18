@@ -8,11 +8,37 @@ import Camera from '@/assets/icons/camera-circle.svg';
 import Close from '@/assets/icons/close-gray.svg';
 import Loader from '@/assets/icons/loader.svg';
 import { OnboardingHeader } from '@/components/domain';
-import { AppText, Button, FormField, Screen } from '@/components/ui';
-import { recognizedSchedule } from '@/data/mock-data';
+import { AppText, Button, DatePickerField, FormField, Screen } from '@/components/ui';
 import { api } from '@/services/api';
 import { useAppStore } from '@/store/use-app-store';
 import { colors, radius, spacing } from '@/theme';
+import type { WorkDay } from '@/types/domain';
+import { formatWorkDayLabel } from '@/utils/formatters';
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function toLocalIso(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function buildBlankSchedule(startDate: string, endDate: string): WorkDay[] {
+  const days: WorkDay[] = [];
+  const cursor = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  while (cursor <= end) {
+    days.push({
+      date: toLocalIso(cursor),
+      label: formatWorkDayLabel(cursor.getMonth() + 1, cursor.getDate(), WEEKDAYS[cursor.getDay()]),
+      kind: 'unknown',
+      startTime: null,
+      endTime: null,
+      needsReview: true,
+      reviewMessage: '근무 종류와 시각을 직접 선택해주세요.',
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
 
 export default function ScheduleUploadScreen() {
   const uri = useAppStore((state) => state.uploadedScheduleUri);
@@ -50,7 +76,7 @@ export default function ScheduleUploadScreen() {
 
   const analyze = async () => {
     if (!uri) {
-      setSchedule(recognizedSchedule.map((day) => ({ ...day })));
+      setSchedule(buildBlankSchedule(startDate, endDate));
       router.replace('/recognition-result');
       return;
     }
@@ -100,8 +126,8 @@ export default function ScheduleUploadScreen() {
         <>
           <AppText variant="caption" color={colors.textSecondary}>근무 날짜 입력 (1주 단위)</AppText>
           <View style={styles.dateRow}>
-            <FormField label="시작 날짜" placeholder="YYYY-MM-DD" value={startDate} onChangeText={(value) => setDateRange(value, endDate)} />
-            <FormField label="종료 날짜" placeholder="YYYY-MM-DD" value={endDate} onChangeText={(value) => setDateRange(startDate, value)} />
+            <DatePickerField label="시작 날짜" value={startDate} onChange={(value) => setDateRange(value, endDate)} />
+            <DatePickerField label="종료 날짜" value={endDate} onChange={(value) => setDateRange(startDate, value)} />
           </View>
           <FormField
             label="특이사항 (선택)"

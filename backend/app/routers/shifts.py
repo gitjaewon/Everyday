@@ -77,7 +77,13 @@ def create_shift_upload(
             image_bytes = f.read()
         content_type = mimetypes.guess_type(file_path)[0] or "image/jpeg"
 
-        recognized = recognize_shifts(image_bytes, content_type, note=payload.note)
+        recognized = recognize_shifts(
+            image_bytes,
+            content_type,
+            note=payload.note,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+        )
 
         # 같은 날짜 재등록이면 새 row 안 늘리고 기존 Shift를 덮어쓴다
         work_dates = [item.work_date for item in recognized]

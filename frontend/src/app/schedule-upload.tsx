@@ -17,8 +17,11 @@ import { colors, radius, spacing } from '@/theme';
 export default function ScheduleUploadScreen() {
   const uri = useAppStore((state) => state.uploadedScheduleUri);
   const note = useAppStore((state) => state.uploadNote);
+  const startDate = useAppStore((state) => state.uploadStartDate);
+  const endDate = useAppStore((state) => state.uploadEndDate);
   const setUri = useAppStore((state) => state.setUploadedSchedule);
   const setNote = useAppStore((state) => state.setUploadNote);
+  const setDateRange = useAppStore((state) => state.setUploadDateRange);
   const setSchedule = useAppStore((state) => state.setSchedule);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +57,7 @@ export default function ScheduleUploadScreen() {
     setAnalyzing(true);
     setError('');
     try {
-      const schedule = await api.analyzeSchedule({ uri, note });
+      const schedule = await api.analyzeSchedule({ uri, note, startDate, endDate });
       setSchedule(schedule);
       router.replace('/recognition-result');
     } catch (reason) {
@@ -95,6 +98,11 @@ export default function ScheduleUploadScreen() {
       </Pressable>
       {!analyzing ? (
         <>
+          <AppText variant="caption" color={colors.textSecondary}>근무 날짜 입력 (1주 단위)</AppText>
+          <View style={styles.dateRow}>
+            <FormField label="시작 날짜" placeholder="YYYY-MM-DD" value={startDate} onChangeText={(value) => setDateRange(value, endDate)} />
+            <FormField label="종료 날짜" placeholder="YYYY-MM-DD" value={endDate} onChangeText={(value) => setDateRange(startDate, value)} />
+          </View>
           <FormField
             label="특이사항 (선택)"
             placeholder={'루틴 설계에 참고하실 점을 특이사항을 적어주세요.\n(ex. 제 이름은 홍길동이고, 저는 평소 하루에 2끼 먹습니다.)'}
@@ -118,6 +126,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xxl },
   uploadCopy: { fontWeight: '700' },
   checker: { flex: 1, backgroundColor: colors.border },
+  dateRow: { flexDirection: 'row', gap: spacing.xxl },
   close: { position: 'absolute', right: spacing.md, top: spacing.md, borderRadius: radius.pill, backgroundColor: colors.surface },
   spacer: { flex: 1, minHeight: spacing.xxl },
 });

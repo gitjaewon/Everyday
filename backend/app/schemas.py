@@ -89,6 +89,8 @@ class ImageUploadResponse(BaseModel):
 class ShiftUploadCreateRequest(BaseModel):
     image_url: str
     note: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 class ShiftUploadResponse(BaseModel):

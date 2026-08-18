@@ -19,6 +19,19 @@ import type {
   WorkDay,
 } from '@/types/domain';
 
+function toIsoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function currentWeekRange() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: toIsoDate(monday), end: toIsoDate(sunday) };
+}
+
 interface AppState {
   hasStarted: boolean;
   user: AuthUser | null;
@@ -26,6 +39,8 @@ interface AppState {
   selectedShiftType: ShiftTypeId | null;
   uploadedScheduleUri: string | null;
   uploadNote: string;
+  uploadStartDate: string;
+  uploadEndDate: string;
   schedule: WorkDay[];
   routines: RoutineItem[];
   pendingFixes: PendingFix[];
@@ -40,6 +55,7 @@ interface AppState {
   selectShiftType: (id: ShiftTypeId) => void;
   setUploadedSchedule: (uri: string | null) => void;
   setUploadNote: (note: string) => void;
+  setUploadDateRange: (startDate: string, endDate: string) => void;
   setSchedule: (schedule: WorkDay[]) => void;
   patchWorkDay: (date: string, patch: Partial<WorkDay>) => void;
   completeOnboarding: () => void;
@@ -61,6 +77,8 @@ export const useAppStore = create<AppState>((set) => ({
   selectedShiftType: null,
   uploadedScheduleUri: null,
   uploadNote: '',
+  uploadStartDate: currentWeekRange().start,
+  uploadEndDate: currentWeekRange().end,
   schedule: clone(recognizedSchedule),
   routines: clone(initialRoutines),
   pendingFixes: clone(initialPendingFixes),
@@ -75,6 +93,7 @@ export const useAppStore = create<AppState>((set) => ({
   selectShiftType: (selectedShiftType) => set({ selectedShiftType }),
   setUploadedSchedule: (uploadedScheduleUri) => set({ uploadedScheduleUri }),
   setUploadNote: (uploadNote) => set({ uploadNote }),
+  setUploadDateRange: (uploadStartDate, uploadEndDate) => set({ uploadStartDate, uploadEndDate }),
   setSchedule: (schedule) => set({ schedule }),
   patchWorkDay: (date, patch) =>
     set((state) => ({

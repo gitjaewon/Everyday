@@ -62,11 +62,23 @@ class ShiftOut(BaseModel):
     review_message: str | None = None
 
 
-def recognize_shifts(image_bytes: bytes, content_type: str, note: str | None = None) -> list[ShiftOut]:
+def recognize_shifts(
+    image_bytes: bytes,
+    content_type: str,
+    note: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> list[ShiftOut]:
     """근무표 사진을 받아 하루 단위 근무 일정을 인식한다."""
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
 
     note_line = f"\n참고 사항: {note}" if note else ""
+    range_line = (
+        f"\n이 근무표는 {start_date.isoformat()}부터 {end_date.isoformat()}까지의 기간이다. "
+        "사진에 연/월 표시가 없거나 불분명해도 반드시 이 범위 안의 날짜로 인식해라."
+        if start_date and end_date
+        else ""
+    )
 
     completion = client.chat.completions.create(
         model=settings.model,
@@ -84,6 +96,7 @@ def recognize_shifts(image_bytes: bytes, content_type: str, note: str | None = N
                             "셀에 시각이 명시돼 있지 않거나 글씨가 불분명해 확신할 수 없는 날짜는 "
                             "needs_review를 true로 하고 review_message에 이유를 한국어로 짧게 적어라. "
                             "확신이 서는 날짜는 needs_review를 false로 한다."
+                            f"{range_line}"
                             f"{note_line}"
                         ),
                     },

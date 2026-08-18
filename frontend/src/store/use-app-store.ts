@@ -7,6 +7,7 @@ import {
   recognizedSchedule,
   redesignedRoutines,
 } from '@/data/mock-data';
+import { inferShiftKind } from '@/utils/shift';
 import type {
   AuthUser,
   IncidentTypeId,
@@ -20,7 +21,7 @@ import type {
 } from '@/types/domain';
 
 function toIsoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function currentWeekRange() {
@@ -97,11 +98,15 @@ export const useAppStore = create<AppState>((set) => ({
   setSchedule: (schedule) => set({ schedule }),
   patchWorkDay: (date, patch) =>
     set((state) => ({
-      schedule: state.schedule.map((day) =>
-        day.date === date
-          ? { ...day, ...patch, needsReview: patch.needsReview ?? (patch.endTime ? false : day.needsReview) }
-          : day,
-      ),
+      schedule: state.schedule.map((day) => {
+        if (day.date !== date) return day;
+        const timeChanged = 'startTime' in patch || 'endTime' in patch;
+        const merged = { ...day, ...patch };
+        // 시각만 입력하고 근무 종류를 직접 안 골랐으면 시작 시각 기준으로 주간/오후/야간을 채워준다.
+        const kind = !patch.kind && timeChanged ? inferShiftKind(merged.startTime, merged.endTime) : merged.kind;
+        const needsReview = patch.needsReview ?? (kind === 'off' ? false : !(merged.startTime && merged.endTime));
+        return { ...merged, kind, needsReview };
+      }),
     })),
   completeOnboarding: () => set({ onboardingComplete: true }),
   setRoutines: (routines) => set({ routines }),

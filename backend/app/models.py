@@ -82,6 +82,9 @@ class RoutineItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=False)
+    # 야간 근무처럼 자정을 넘기는 항목(예: 근무 종료 03:00)은 근무 시작일이 아니라
+    # 실제 발생하는 날짜를 저장한다. 기본값은 근무 시작일과 동일.
+    work_date = Column(Date, nullable=False, index=True)
     category = Column(String, nullable=False)  # sleep / meal / caffeine / exercise
     title = Column(String, nullable=False)
     description = Column(String)
@@ -92,10 +95,6 @@ class RoutineItem(Base):
 
     user = relationship("User", back_populates="routine_items")
     shift = relationship("Shift", back_populates="routine_items")
-
-    @property
-    def work_date(self):
-        return self.shift.work_date
 
 
 class Alert(Base):

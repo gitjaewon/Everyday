@@ -1,7 +1,7 @@
 import calendar
 import mimetypes
 import os
-from datetime import date as date_type, datetime
+from datetime import date as date_type, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -23,6 +23,39 @@ from ..schemas import (
 from ..shift_ocr import recognize_shifts
 
 router = APIRouter(prefix="/shifts", tags=["shifts"])
+
+
+def _missing_time_review(shift_type: str, start_time, end_time) -> tuple[bool, str | None]:
+    """off가 아닌데 시작/종료 시각이 비어있으면 확인 필요 상태로 남긴다."""
+    if shift_type == "off":
+        return False, None
+    missing_start, missing_end = start_time is None, end_time is None
+    if not missing_start and not missing_end:
+        return False, None
+    if missing_start and missing_end:
+        label = "시작·종료 시각이"
+    elif missing_start:
+        label = "시작 시각이"
+    else:
+        label = "종료 시각이"
+    return True, f"{label} 인식되지 않았습니다.\n직접 입력해주세요."
+
+
+def _routine_item_dates(shift, items):
+    """야간처럼 자정을 넘기는 근무는, 근무 시작 이후 나오는 항목 중 시작 시각보다
+    시계상 이른 시각(예: 21시 근무 시작 후 03시 근무 종료)을 다음날 날짜로 넘긴다."""
+    wraps = shift.start_time is not None and shift.end_time is not None and shift.end_time < shift.start_time
+    past_start = False
+    dates = []
+    for item in items:
+        rolled = False
+        if wraps:
+            if item.time >= shift.start_time:
+                past_start = True
+            elif past_start:
+                rolled = True
+        dates.append(shift.work_date + timedelta(days=1) if rolled else shift.work_date)
+    return dates
 
 
 @router.get("", response_model=list[ShiftResponse])
@@ -171,8 +204,7 @@ def confirm_schedule(
         shift.shift_type = item.shift_type
         shift.start_time = item.start_time
         shift.end_time = item.end_time
-        shift.needs_review = False
-        shift.review_message = None
+        shift.needs_review, shift.review_message = _missing_time_review(item.shift_type, item.start_time, item.end_time)
         shifts.append(shift)
     db.commit()
     for shift in shifts:
@@ -183,21 +215,29 @@ def confirm_schedule(
     db.commit()
 
     shifts_by_date = {shift.work_date: shift for shift in shifts}
-    day_routines = generate_routines(shifts)
+    routine_ready_shifts = [shift for shift in shifts if not shift.needs_review]
+    ready_dates = {shift.work_date for shift in routine_ready_shifts}
+    day_routines = generate_routines(routine_ready_shifts) if routine_ready_shifts else []
 
-    routine_items = [
-        RoutineItem(
-            user_id=current_user.id,
-            shift_id=shifts_by_date[day.work_date].id,
-            category=item.type,
-            title=item.label,
-            description=item.note,
-            start_time=item.time,
-        )
-        for day in day_routines
-        if day.work_date in shifts_by_date
-        for item in day.items
-    ]
+    routine_items = []
+    for day in day_routines:
+        # LLM이 요청에 없던 날짜(예: 근무일 사이 휴무 추정)를 지어내는 경우가 있어,
+        # 실제로 시간이 채워져 입력에 넘긴 날짜만 저장한다.
+        if day.work_date not in ready_dates:
+            continue
+        shift = shifts_by_date[day.work_date]
+        for item, item_date in zip(day.items, _routine_item_dates(shift, day.items)):
+            routine_items.append(
+                RoutineItem(
+                    user_id=current_user.id,
+                    shift_id=shift.id,
+                    work_date=item_date,
+                    category=item.type,
+                    title=item.label,
+                    description=item.note,
+                    start_time=item.time,
+                )
+            )
     db.add_all(routine_items)
     db.commit()
     for routine_item in routine_items:
@@ -331,19 +371,23 @@ def generate_routines_for_upload(
     shifts_by_date = {shift.work_date: shift for shift in shifts}
     day_routines = generate_routines(shifts)
 
-    routine_items = [
-        RoutineItem(
-            user_id=current_user.id,
-            shift_id=shifts_by_date[day.work_date].id,
-            category=item.type,
-            title=item.label,
-            description=item.note,
-            start_time=item.time,
-        )
-        for day in day_routines
-        if day.work_date in shifts_by_date
-        for item in day.items
-    ]
+    routine_items = []
+    for day in day_routines:
+        if day.work_date not in shifts_by_date:
+            continue
+        shift = shifts_by_date[day.work_date]
+        for item, item_date in zip(day.items, _routine_item_dates(shift, day.items)):
+            routine_items.append(
+                RoutineItem(
+                    user_id=current_user.id,
+                    shift_id=shift.id,
+                    work_date=item_date,
+                    category=item.type,
+                    title=item.label,
+                    description=item.note,
+                    start_time=item.time,
+                )
+            )
 
     db.add_all(routine_items)
     db.commit()
@@ -361,8 +405,7 @@ def list_routines_for_date(
 ):
     return (
         db.query(RoutineItem)
-        .join(Shift, RoutineItem.shift_id == Shift.id)
-        .filter(Shift.work_date == work_date, RoutineItem.user_id == current_user.id)
+        .filter(RoutineItem.work_date == work_date, RoutineItem.user_id == current_user.id)
         .order_by(RoutineItem.start_time)
         .all()
     )

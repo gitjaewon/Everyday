@@ -79,20 +79,37 @@ def create_shift_upload(
 
         recognized = recognize_shifts(image_bytes, content_type, note=payload.note)
 
-        shifts = [
-            Shift(
-                user_id=current_user.id,
-                upload_id=upload.id,
-                work_date=item.work_date,
-                shift_type=item.shift_type,
-                start_time=item.start_time,
-                end_time=item.end_time,
-                needs_review=item.needs_review,
-                review_message=item.review_message,
-            )
-            for item in recognized
-        ]
-        db.add_all(shifts)
+        # 같은 날짜 재등록이면 새 row 안 늘리고 기존 Shift를 덮어쓴다
+        work_dates = [item.work_date for item in recognized]
+        existing_by_date = {
+            shift.work_date: shift
+            for shift in db.query(Shift)
+            .filter(Shift.user_id == current_user.id, Shift.work_date.in_(work_dates))
+            .all()
+        }
+
+        shifts = []
+        for item in recognized:
+            shift = existing_by_date.get(item.work_date)
+            if shift is None:
+                shift = Shift(user_id=current_user.id, work_date=item.work_date)
+                db.add(shift)
+            shift.upload_id = upload.id
+            shift.shift_type = item.shift_type
+            shift.start_time = item.start_time
+            shift.end_time = item.end_time
+            shift.needs_review = item.needs_review
+            shift.review_message = item.review_message
+            shifts.append(shift)
+
+        db.flush()
+
+        # 덮어쓴 날짜에 붙어있던 옛 루틴은 더 이상 맞지 않으니 지운다
+        shift_ids = [shift.id for shift in shifts]
+        db.query(RoutineItem).filter(RoutineItem.shift_id.in_(shift_ids)).delete(
+            synchronize_session=False
+        )
+
         upload.status = "done"
     except Exception as e:
         upload.status = "failed"

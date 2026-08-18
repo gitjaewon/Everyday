@@ -25,6 +25,7 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ animation: 'fade' }} />
+      <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />
       <Stack.Screen name="shift-type" />

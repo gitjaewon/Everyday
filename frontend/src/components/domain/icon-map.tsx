@@ -11,6 +11,17 @@ import RoutineMeal from '@/assets/icons/routine-meal.svg';
 import RoutineSleep from '@/assets/icons/routine-sleep.svg';
 import RoutineWake from '@/assets/icons/routine-wake.svg';
 import RoutineWork from '@/assets/icons/routine-work.svg';
+import SettingAlarm from '@/assets/icons/settings-alarm.svg';
+import SettingCaffeine from '@/assets/icons/settings-caffeine.svg';
+import SettingCommute from '@/assets/icons/settings-commute.svg';
+import SettingEdit from '@/assets/icons/settings-edit.svg';
+import SettingMeal from '@/assets/icons/settings-meal.svg';
+import SettingNap from '@/assets/icons/settings-nap.svg';
+import SettingPush from '@/assets/icons/settings-push.svg';
+import SettingReupload from '@/assets/icons/settings-reupload.svg';
+import SettingShiftSwap from '@/assets/icons/settings-shift-swap.svg';
+import SettingSleep from '@/assets/icons/settings-sleep.svg';
+import SettingWake from '@/assets/icons/settings-wake.svg';
 import ShiftCustom from '@/assets/icons/shift-custom.svg';
 import ShiftDay from '@/assets/icons/shift-day.svg';
 import ShiftNight from '@/assets/icons/shift-night.svg';
@@ -40,4 +51,18 @@ export const incidentIconMap: Record<IncidentTypeId, ComponentType<SvgProps>> = 
   emergency: IncidentEmergency,
   'sleep-interrupted': IncidentSleep,
   other: IncidentOther,
+};
+
+export const settingsIconMap: Record<string, ComponentType<SvgProps>> = {
+  alarms: SettingAlarm,
+  push: SettingPush,
+  wake: SettingWake,
+  sleep: SettingSleep,
+  meal: SettingMeal,
+  caffeine: SettingCaffeine,
+  commute: SettingCommute,
+  nap: SettingNap,
+  edit: SettingEdit,
+  upload: SettingReupload,
+  shift: SettingShiftSwap,
 };

@@ -48,7 +48,7 @@ export function Button({
                 ? colors.onBrand
                 : variant === 'outline'
                   ? colors.text
-                  : colors.brand
+                  : colors.textMuted
           }
           style={styles.label}
         >

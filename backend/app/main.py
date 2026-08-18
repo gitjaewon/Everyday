@@ -3,10 +3,28 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from .config import settings
 from .database import Base, engine
 from .routers import alerts, auth, images, routines, shifts, users
+
+
+def _add_routine_work_date_column() -> None:
+    """routine_items.work_date는 create_all이 못 건드리는 기존 테이블에 나중에 추가된 컬럼이라
+    직접 ALTER + 백필해준다 (기존 행은 일단 근무 시작일과 동일하게 채움)."""
+    with engine.begin() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(routine_items)"))}
+        if "work_date" in columns:
+            return
+        conn.execute(text("ALTER TABLE routine_items ADD COLUMN work_date DATE"))
+        conn.execute(
+            text(
+                "UPDATE routine_items SET work_date = ("
+                "SELECT shifts.work_date FROM shifts WHERE shifts.id = routine_items.shift_id"
+                ")"
+            )
+        )
 
 
 @asynccontextmanager
@@ -19,6 +37,7 @@ async def lifespan(app: FastAPI):
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _add_routine_work_date_column()
     yield
 
 

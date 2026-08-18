@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import ChevronLeft from '@/assets/icons/chevron-left.svg';
+import ChevronRight from '@/assets/icons/chevron-right.svg';
 import { OnboardingHeader, WorkDayCard } from '@/components/domain';
 import { AppText, Button, InlineAlert, Screen } from '@/components/ui';
 import { api } from '@/services/api';
@@ -16,6 +18,10 @@ export default function RecognitionResultScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const reviewCount = schedule.filter((day) => day.needsReview).length;
+  const firstDay = schedule[0] ? new Date(`${schedule[0].date}T00:00:00`) : null;
+  const weekLabel = firstDay
+    ? `${firstDay.getMonth() + 1}월 ${Math.ceil(firstDay.getDate() / 7)}주`
+    : '';
 
   const confirm = async () => {
     setLoading(true);
@@ -35,10 +41,15 @@ export default function RecognitionResultScreen() {
   return (
     <Screen scroll contentStyle={styles.screen}>
       <OnboardingHeader step={3} />
-      <AppText variant="h1">AI 인식 결과 확인</AppText>
+      <AppText variant="h1">근무표 수정</AppText>
       <AppText variant="body1">아래 항목을 검토 후, 틀리거나 누락된 값을 수정하세요.</AppText>
       <InlineAlert title={`확인이 필요한 날짜 ${reviewCount}개`} body="AI가 인식하지 못한 시각 및 일정이 있습니다." />
       <AppText variant="h3" style={styles.sectionTitle}>인식된 근무 일정</AppText>
+      <View style={styles.weekNav}>
+        <ChevronLeft width={20} height={20} />
+        <AppText variant="body1">{weekLabel}</AppText>
+        <ChevronRight width={20} height={20} />
+      </View>
       <View style={styles.list}>
         {schedule.map((day) => <WorkDayCard key={day.date} day={day} showDropdown onChange={(patch) => patchWorkDay(day.date, patch)} />)}
       </View>
@@ -52,5 +63,6 @@ export default function RecognitionResultScreen() {
 const styles = StyleSheet.create({
   screen: { paddingBottom: spacing.xxl, gap: spacing.md },
   sectionTitle: { marginTop: spacing.xxl },
+  weekNav: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   list: { gap: spacing.sm, marginBottom: spacing.xxl },
 });

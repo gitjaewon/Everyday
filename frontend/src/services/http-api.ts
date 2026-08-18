@@ -11,6 +11,7 @@ import type {
   UploadedSchedule,
   WorkDay,
 } from '@/types/domain';
+import { inferShiftKind } from '@/utils/shift';
 import type { HarugyeolApi } from './api';
 import { clearAccessToken, getAccessToken, setAccessToken } from './token-storage';
 
@@ -159,7 +160,13 @@ export const httpApi: HarugyeolApi = {
   async analyzeSchedule(upload) {
     const image = await uploadImage(upload);
     const created = await request<ShiftUploadResponse>('/shifts/uploads', {
-      method: 'POST', body: JSON.stringify({ image_url: image.image_url, note: upload.note || null }),
+      method: 'POST',
+      body: JSON.stringify({
+        image_url: image.image_url,
+        note: upload.note || null,
+        start_date: upload.startDate || null,
+        end_date: upload.endDate || null,
+      }),
     });
     if (created.status === 'failed') throw new Error('근무표 인식에 실패했습니다. 다시 시도해주세요.');
     const shifts = await request<ShiftResponse[]>(`/shifts/uploads/${created.id}/shifts`, { method: 'GET' });
@@ -167,12 +174,15 @@ export const httpApi: HarugyeolApi = {
   },
   async confirmSchedule(schedule) {
     if (!schedule.length) return [];
-    const shifts = schedule.map((day) => ({
-      work_date: day.date,
-      shift_type: day.kind === 'unknown' ? 'day' : day.kind,
-      start_time: day.startTime,
-      end_time: day.endTime,
-    }));
+    const shifts = schedule.map((day) => {
+      const kind = day.kind === 'unknown' ? inferShiftKind(day.startTime, day.endTime) : day.kind;
+      return {
+        work_date: day.date,
+        shift_type: kind === 'unknown' ? 'day' : kind,
+        start_time: day.startTime,
+        end_time: day.endTime,
+      };
+    });
     const routines = await request<RoutineResponse[]>('/shifts/confirm', { method: 'POST', body: JSON.stringify({ shifts }) });
     return routines.map(toRoutineItem);
   },

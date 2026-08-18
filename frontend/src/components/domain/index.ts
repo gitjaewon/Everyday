@@ -1,4 +1,4 @@
-export { incidentIconMap, routineIconMap, shiftIconMap } from './icon-map';
+export { incidentIconMap, routineIconMap, settingsIconMap, shiftIconMap } from './icon-map';
 export { IncidentOptionCard, WearableAlertCard } from './incident-card';
 export { OnboardingHeader } from './onboarding-header';
 export { RoutineCard } from './routine-card';

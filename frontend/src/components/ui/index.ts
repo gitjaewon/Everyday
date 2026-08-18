@@ -2,6 +2,7 @@ export { AppText, type AppTextProps } from './app-text';
 export { BottomSheetModal } from './bottom-sheet-modal';
 export { Button, ButtonRow } from './button';
 export { Card } from './card';
+export { DatePickerField } from './date-picker-field';
 export { DisclaimerCard } from './disclaimer-card';
 export { FormField } from './form-field';
 export { InlineAlert } from './inline-alert';

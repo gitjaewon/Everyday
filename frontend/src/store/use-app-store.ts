@@ -7,6 +7,7 @@ import {
   recognizedSchedule,
   redesignedRoutines,
 } from '@/data/mock-data';
+import { inferShiftKind } from '@/utils/shift';
 import type {
   AuthUser,
   IncidentTypeId,
@@ -19,6 +20,19 @@ import type {
   WorkDay,
 } from '@/types/domain';
 
+function toIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function currentWeekRange() {
+  const today = new Date();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: toIsoDate(monday), end: toIsoDate(sunday) };
+}
+
 interface AppState {
   hasStarted: boolean;
   user: AuthUser | null;
@@ -26,6 +40,8 @@ interface AppState {
   selectedShiftType: ShiftTypeId | null;
   uploadedScheduleUri: string | null;
   uploadNote: string;
+  uploadStartDate: string;
+  uploadEndDate: string;
   schedule: WorkDay[];
   routines: RoutineItem[];
   pendingFixes: PendingFix[];
@@ -40,6 +56,7 @@ interface AppState {
   selectShiftType: (id: ShiftTypeId) => void;
   setUploadedSchedule: (uri: string | null) => void;
   setUploadNote: (note: string) => void;
+  setUploadDateRange: (startDate: string, endDate: string) => void;
   setSchedule: (schedule: WorkDay[]) => void;
   patchWorkDay: (date: string, patch: Partial<WorkDay>) => void;
   completeOnboarding: () => void;
@@ -61,6 +78,8 @@ export const useAppStore = create<AppState>((set) => ({
   selectedShiftType: null,
   uploadedScheduleUri: null,
   uploadNote: '',
+  uploadStartDate: currentWeekRange().start,
+  uploadEndDate: currentWeekRange().end,
   schedule: clone(recognizedSchedule),
   routines: clone(initialRoutines),
   pendingFixes: clone(initialPendingFixes),
@@ -75,14 +94,19 @@ export const useAppStore = create<AppState>((set) => ({
   selectShiftType: (selectedShiftType) => set({ selectedShiftType }),
   setUploadedSchedule: (uploadedScheduleUri) => set({ uploadedScheduleUri }),
   setUploadNote: (uploadNote) => set({ uploadNote }),
+  setUploadDateRange: (uploadStartDate, uploadEndDate) => set({ uploadStartDate, uploadEndDate }),
   setSchedule: (schedule) => set({ schedule }),
   patchWorkDay: (date, patch) =>
     set((state) => ({
-      schedule: state.schedule.map((day) =>
-        day.date === date
-          ? { ...day, ...patch, needsReview: patch.needsReview ?? (patch.endTime ? false : day.needsReview) }
-          : day,
-      ),
+      schedule: state.schedule.map((day) => {
+        if (day.date !== date) return day;
+        const timeChanged = 'startTime' in patch || 'endTime' in patch;
+        const merged = { ...day, ...patch };
+        // 시각만 입력하고 근무 종류를 직접 안 골랐으면 시작 시각 기준으로 주간/오후/야간을 채워준다.
+        const kind = !patch.kind && timeChanged ? inferShiftKind(merged.startTime, merged.endTime) : merged.kind;
+        const needsReview = patch.needsReview ?? (kind === 'off' ? false : !(merged.startTime && merged.endTime));
+        return { ...merged, kind, needsReview };
+      }),
     })),
   completeOnboarding: () => set({ onboardingComplete: true }),
   setRoutines: (routines) => set({ routines }),

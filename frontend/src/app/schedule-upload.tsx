@@ -8,17 +8,46 @@ import Camera from '@/assets/icons/camera-circle.svg';
 import Close from '@/assets/icons/close-gray.svg';
 import Loader from '@/assets/icons/loader.svg';
 import { OnboardingHeader } from '@/components/domain';
-import { AppText, Button, FormField, Screen } from '@/components/ui';
-import { recognizedSchedule } from '@/data/mock-data';
+import { AppText, Button, DatePickerField, FormField, Screen } from '@/components/ui';
 import { api } from '@/services/api';
 import { useAppStore } from '@/store/use-app-store';
 import { colors, radius, spacing } from '@/theme';
+import type { WorkDay } from '@/types/domain';
+import { formatWorkDayLabel } from '@/utils/formatters';
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function toLocalIso(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function buildBlankSchedule(startDate: string, endDate: string): WorkDay[] {
+  const days: WorkDay[] = [];
+  const cursor = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  while (cursor <= end) {
+    days.push({
+      date: toLocalIso(cursor),
+      label: formatWorkDayLabel(cursor.getMonth() + 1, cursor.getDate(), WEEKDAYS[cursor.getDay()]),
+      kind: 'unknown',
+      startTime: null,
+      endTime: null,
+      needsReview: true,
+      reviewMessage: '근무 종류와 시각을 직접 선택해주세요.',
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
 
 export default function ScheduleUploadScreen() {
   const uri = useAppStore((state) => state.uploadedScheduleUri);
   const note = useAppStore((state) => state.uploadNote);
+  const startDate = useAppStore((state) => state.uploadStartDate);
+  const endDate = useAppStore((state) => state.uploadEndDate);
   const setUri = useAppStore((state) => state.setUploadedSchedule);
   const setNote = useAppStore((state) => state.setUploadNote);
+  const setDateRange = useAppStore((state) => state.setUploadDateRange);
   const setSchedule = useAppStore((state) => state.setSchedule);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -47,14 +76,14 @@ export default function ScheduleUploadScreen() {
 
   const analyze = async () => {
     if (!uri) {
-      setSchedule(recognizedSchedule.map((day) => ({ ...day })));
+      setSchedule(buildBlankSchedule(startDate, endDate));
       router.replace('/recognition-result');
       return;
     }
     setAnalyzing(true);
     setError('');
     try {
-      const schedule = await api.analyzeSchedule({ uri, note });
+      const schedule = await api.analyzeSchedule({ uri, note, startDate, endDate });
       setSchedule(schedule);
       router.replace('/recognition-result');
     } catch (reason) {
@@ -95,6 +124,11 @@ export default function ScheduleUploadScreen() {
       </Pressable>
       {!analyzing ? (
         <>
+          <AppText variant="caption" color={colors.textSecondary}>근무 날짜 입력 (1주 단위)</AppText>
+          <View style={styles.dateRow}>
+            <DatePickerField label="시작 날짜" value={startDate} onChange={(value) => setDateRange(value, endDate)} />
+            <DatePickerField label="종료 날짜" value={endDate} onChange={(value) => setDateRange(startDate, value)} />
+          </View>
           <FormField
             label="특이사항 (선택)"
             placeholder={'루틴 설계에 참고하실 점을 특이사항을 적어주세요.\n(ex. 제 이름은 홍길동이고, 저는 평소 하루에 2끼 먹습니다.)'}
@@ -118,6 +152,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xxl },
   uploadCopy: { fontWeight: '700' },
   checker: { flex: 1, backgroundColor: colors.border },
+  dateRow: { flexDirection: 'row', gap: spacing.xxl },
   close: { position: 'absolute', right: spacing.md, top: spacing.md, borderRadius: radius.pill, backgroundColor: colors.surface },
   spacer: { flex: 1, minHeight: spacing.xxl },
 });

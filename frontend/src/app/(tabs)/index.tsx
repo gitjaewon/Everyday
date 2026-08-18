@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { RoutineCard, WeekStrip } from '@/components/domain';
@@ -26,7 +27,7 @@ function getWeekDates(base: Date): Date[] {
 }
 
 function toIsoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export default function HomeScreen() {
@@ -35,18 +36,22 @@ export default function HomeScreen() {
   const [dayRoutines, setDayRoutines] = useState<RoutineItem[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.getShiftsForMonth(today.getFullYear(), today.getMonth() + 1).then(setMonthShifts).catch(() => setMonthShifts([]));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      api.getShiftsForMonth(today.getFullYear(), today.getMonth() + 1).then(setMonthShifts).catch(() => setMonthShifts([]));
+    }, []),
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getRoutinesForDate(selectedDate)
-      .then((routines) => { if (!cancelled) setDayRoutines(routines); })
-      .catch(() => { if (!cancelled) setDayRoutines([]); });
-    return () => { cancelled = true; };
-  }, [selectedDate]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      api
+        .getRoutinesForDate(selectedDate)
+        .then((routines) => { if (!cancelled) setDayRoutines(routines); })
+        .catch(() => { if (!cancelled) setDayRoutines([]); });
+      return () => { cancelled = true; };
+    }, [selectedDate]),
+  );
 
   const shiftsByDate = useMemo(() => new Map(monthShifts.map((shift) => [shift.date, shift])), [monthShifts]);
 

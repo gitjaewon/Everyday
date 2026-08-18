@@ -140,6 +140,8 @@ export interface SignupPayload extends AuthCredentials {
 export interface UploadedSchedule {
   uri: string;
   note: string;
+  startDate: string;
+  endDate: string;
 }
 
 export interface IncidentReport {

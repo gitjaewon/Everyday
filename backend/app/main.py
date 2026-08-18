@@ -48,10 +48,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# 개발 단계에서는 모든 출처를 허용한다. 배포 시 프론트엔드 도메인으로 좁힐 것.
+# CORS_ORIGINS 환경변수로 허용 출처를 제어한다. 비워두면(개발 기본값) 전부 허용.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

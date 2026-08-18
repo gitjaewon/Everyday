@@ -35,7 +35,14 @@
           "imageWidth": 100
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "근무표 사진을 촬영하기 위해 카메라 접근을 허용해 주세요.",
+          "photosPermission": "근무표 사진을 선택하기 위해 사진 보관함 접근을 허용해 주세요."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

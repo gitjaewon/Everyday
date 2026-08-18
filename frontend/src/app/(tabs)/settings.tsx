@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import ChevronRight from '@/assets/icons/chevron-right.svg';
-import { AppText, Card, DisclaimerCard, Screen, SwitchControl } from '@/components/ui';
+import { AppText, DisclaimerCard, Screen, SwitchControl } from '@/components/ui';
 import { settingsLinks } from '@/data/mock-data';
 import { useAppStore } from '@/store/use-app-store';
 import { colors, radius, spacing } from '@/theme';

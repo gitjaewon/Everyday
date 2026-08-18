@@ -54,6 +54,8 @@ def create_shift_upload(
         content_type = mimetypes.guess_type(file_path)[0] or "image/jpeg"
 
         recognized = recognize_shifts(image_bytes, content_type, note=payload.note)
+        if not recognized:
+            raise ValueError("No shifts were recognized from the image")
 
         shifts = [
             Shift(
@@ -76,6 +78,12 @@ def create_shift_upload(
 
     db.commit()
     db.refresh(upload)
+
+    if upload.status == "failed":
+        raise HTTPException(
+            status_code=422,
+            detail="근무표를 인식하지 못했습니다. 날짜와 근무 코드가 선명하게 보이도록 다시 촬영해 주세요.",
+        )
 
     return ShiftUploadResponse(
         id=upload.id,

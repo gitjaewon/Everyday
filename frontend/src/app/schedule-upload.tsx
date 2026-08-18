@@ -1,8 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import Camera from '@/assets/icons/camera-circle.svg';
 import Close from '@/assets/icons/close-gray.svg';
@@ -21,7 +21,7 @@ export default function ScheduleUploadScreen() {
   const setSchedule = useAppStore((state) => state.setSchedule);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
-  const spin = useRef(new Animated.Value(0)).current;
+  const [spin] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (!analyzing) return;
@@ -30,18 +30,39 @@ export default function ScheduleUploadScreen() {
     return () => animation.stop();
   }, [analyzing, spin]);
 
-  const pickSchedule = async () => {
+  const selectImage = async (source: 'camera' | 'library') => {
+    try {
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError(source === 'camera' ? '카메라 권한을 허용해 주세요.' : '사진 보관함 권한을 허용해 주세요.');
+        return;
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.9 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.9 });
+      if (!result.canceled) {
+        setError('');
+        setUri(result.assets[0].uri);
+      }
+    } catch {
+      setError('사진을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  };
+
+  const pickSchedule = () => {
     if (analyzing) return;
     if (uri) {
       setUri(null);
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.9,
-    });
-    if (!result.canceled) setUri(result.assets[0].uri);
+    Alert.alert('근무표 사진 등록', '카메라로 촬영하거나 사진 보관함에서 선택해 주세요.', [
+      { text: '촬영하기', onPress: () => void selectImage('camera') },
+      { text: '사진 선택', onPress: () => void selectImage('library') },
+      { text: '취소', style: 'cancel' },
+    ]);
   };
 
   const analyze = async () => {

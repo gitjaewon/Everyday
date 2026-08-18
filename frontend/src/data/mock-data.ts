@@ -68,7 +68,7 @@ export const initialRoutines: RoutineItem[] = [
   { id: 'sleep', title: '퇴근 후 파워냅', time: '06:30', status: 'waiting', icon: 'sleep' },
 ];
 
-const calendarKinds: Array<CalendarCell['kind']> = [
+const calendarKinds: CalendarCell['kind'][] = [
   'day', 'day', 'day', 'day', 'off', 'off', 'night', 'night', 'night', 'night', 'off', 'day', 'day', 'day',
   'day', 'day', 'off', 'off', 'night', 'night', 'night', 'night', 'unknown', 'off', 'off', 'day', 'day', 'day',
   'day', 'off', 'off', 'night',

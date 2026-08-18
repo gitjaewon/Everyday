@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PropsWithChildren } from 'react';
+import { useEffect, useState, type PropsWithChildren } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,7 +11,7 @@ interface BottomSheetModalProps extends PropsWithChildren {
 }
 
 export function BottomSheetModal({ visible, onClose, fullHeight = false, children }: BottomSheetModalProps) {
-  const translateY = useRef(new Animated.Value(40)).current;
+  const [translateY] = useState(() => new Animated.Value(40));
   const insets = useSafeAreaInsets();
 
   useEffect(() => {

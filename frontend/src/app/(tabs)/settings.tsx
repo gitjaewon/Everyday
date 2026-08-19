@@ -5,6 +5,7 @@ import ChevronRight from '@/assets/icons/chevron-right.svg';
 import { settingsIconMap } from '@/components/domain';
 import { AppText, Card, DisclaimerCard, Screen, SwitchControl } from '@/components/ui';
 import { settingsLinks } from '@/data/mock-data';
+import { api } from '@/services/api';
 import { useAppStore } from '@/store/use-app-store';
 import { colors, radius, spacing } from '@/theme';
 
@@ -20,6 +21,17 @@ function Tile({ id }: { id: string }) {
 export default function SettingsScreen() {
   const settings = useAppStore((state) => state.settings);
   const toggle = useAppStore((state) => state.toggleSetting);
+  const setUser = useAppStore((state) => state.setUser);
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } finally {
+      setUser(null);
+      router.replace('/welcome');
+    }
+  };
+
   return (
     <Screen scroll padded={false} contentStyle={styles.screen}>
       <View style={styles.header}><AppText variant="h1">설정</AppText></View>
@@ -51,6 +63,9 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </SettingGroup>
+        <Pressable accessibilityRole="button" accessibilityLabel="로그아웃" onPress={logout}>
+          <AppText variant="caption" color={colors.textTertiary} style={styles.logout}>로그아웃</AppText>
+        </Pressable>
         <DisclaimerCard />
       </View>
     </Screen>
@@ -66,4 +81,5 @@ const styles = StyleSheet.create({
   row: { minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   tile: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   label: { flex: 1, fontWeight: '600' },
+  logout: { textDecorationLine: 'underline' },
 });

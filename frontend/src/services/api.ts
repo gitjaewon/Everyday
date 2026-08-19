@@ -15,6 +15,7 @@ import { httpApi } from './http-api';
 export interface HarugyeolApi {
   login(credentials: AuthCredentials): Promise<AuthUser>;
   signup(payload: SignupPayload): Promise<AuthUser>;
+  logout(): Promise<void>;
   updateWorkPattern(pattern: import('@/types/domain').ShiftTypeId): Promise<void>;
   getShiftsForMonth(year: number, month: number): Promise<WorkDay[]>;
   analyzeSchedule(upload: UploadedSchedule): Promise<WorkDay[]>;

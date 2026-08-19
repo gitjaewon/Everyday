@@ -150,6 +150,13 @@ export const httpApi: HarugyeolApi = {
       password_confirm: payload.password, terms_agreed: payload.consented,
     });
   },
+  async logout() {
+    try {
+      await request('/auth/logout', { method: 'POST' });
+    } finally {
+      await clearAccessToken();
+    }
+  },
   async updateWorkPattern(pattern) {
     await request('/users/me/work-pattern', { method: 'PATCH', body: JSON.stringify({ work_pattern: workPatternMap[pattern] }) });
   },

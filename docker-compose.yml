@@ -3,7 +3,7 @@ services:
     build: ./backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       # SQLite 파일과 업로드 이미지를 컨테이너 재시작 후에도 유지한다
       - ./backend/data:/app/data
